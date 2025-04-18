@@ -20,7 +20,7 @@ export const signUp = async (req, res, next) => {
       return res.status(409).json({ message: 'Email already in use' });
     }
     
-    // Hash  password
+    // Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
     
@@ -40,33 +40,42 @@ export const signUp = async (req, res, next) => {
       role: role || 'contractor' // Use provided role or default to contractor
     });
     
-    // Send email verification code
-    try {
-      await emailService.sendVerificationCode(newUser.email, emailVerificationCode);
-      res.status(200).json({
-        status: 'success',
-        message: 'Verification code sent to your email. Please check your inbox.'
-      })
-    } catch (emailError) {
-      console.error('Error sending email:', emailError);
-      return res.status(500).json({ message: 'Failed to send verification code. Please try again.' });
-    }
-    
+    // Prepare user data for response
     const userData = newUser.toObject();
     delete userData.password;
     delete userData.emailVerificationCode;
     delete userData.phoneVerificationCode;
     
-    res.status(201).json({
-      status: 'success',
-      message: 'User registered successfully. Please verify your email.',
-      data: {
-        userId: userData._id,
-        email: userData.email,
-        phoneNumber: userData.phoneNumber
-      }
-    });
+    // Send email verification code
+    try {
+      await emailService.sendVerificationCode(newUser.email, emailVerificationCode);
+      
+      // Only send one response after everything is done
+      return res.status(201).json({
+        status: 'success',
+        message: 'User registered successfully. Please verify your email.',
+        data: {
+          userId: userData._id,
+          email: userData.email,
+          phoneNumber: userData.phoneNumber
+        }
+      });
+    } catch (emailError) {
+      console.error('Error sending email:', emailError);
+      // If email fails, the user was created but we couldn't send verification
+      // We should still return the user ID so the frontend can handle verification
+      return res.status(201).json({ 
+        status: 'partial_success',
+        message: 'Account created but verification email could not be sent. Please request a new code.',
+        data: {
+          userId: userData._id,
+          email: userData.email,
+          phoneNumber: userData.phoneNumber
+        }
+      });
+    }
   } catch (error) {
+    console.error('Signup error:', error);
     next(error);
   }
 };
