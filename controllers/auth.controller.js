@@ -1,7 +1,7 @@
 import User from '../models/user.model.js';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
-// import twilio from '../utils/twilio.js';
+import twilio from '../utils/twilio.js';
 import emailService from '../utils/nodemailer.js';
 
 
@@ -80,7 +80,6 @@ export const signUp = async (req, res, next) => {
   }
 };
 
-
 export const verifyEmail = async (req, res, next) => {
   try {
     const { userId, code } = req.body;
@@ -136,11 +135,10 @@ export const sendPhoneVerificationCode = async (req, res, next) => {
     
     // Send verification code via Twilio
     try {
-      // You would use Twilio or similar service here
-      // await twilio.sendSMS(
-      //   user.phoneNumber, 
-      //   `Your verification code is: ${user.phoneVerificationCode}`
-      // );
+      await twilio.sendSMS(
+        user.phoneNumber, 
+        `Your verification code is: ${user.phoneVerificationCode}`
+      );
     } catch (smsError) {
       console.error('Error sending SMS:', smsError);
       return res.status(500).json({ message: 'Failed to send verification code. Please try again.' });
@@ -220,9 +218,8 @@ export const resendEmailVerification = async (req, res, next) => {
     // Send email with the new code
     // Placeholder for email sending logic
     try {
-      // You would implement the actual email sending here
-      console.log(`New email verification code: ${newCode} sent to ${user.email}`);
-      // Simulate email sending success
+      await emailService.sendVerificationCode(newUser.email, newCode);
+
     } catch (emailError) {
       console.error('Error sending email:', emailError);
       return res.status(500).json({ message: 'Failed to send verification code. Please try again.' });
@@ -265,11 +262,10 @@ export const resendPhoneVerification = async (req, res, next) => {
     
     // Send SMS with the new code
     try {
-      // You would use Twilio or similar service here
-      // await twilio.sendSMS(
-      //   user.phoneNumber, 
-      //   `Your verification code is: ${newCode}`
-      // );
+      await twilio.sendSMS(
+        user.phoneNumber, 
+        `Your verification code is: ${newCode}`
+      );
     } catch (smsError) {
       console.error('Error sending SMS:', smsError);
       return res.status(500).json({ message: 'Failed to send verification code. Please try again.' });
@@ -283,6 +279,8 @@ export const resendPhoneVerification = async (req, res, next) => {
     next(error);
   }
 };
+
+
 /**
  * User sign-in controller
  */
@@ -290,22 +288,31 @@ export const signIn = async (req, res, next) => {
   try {
     const { email, password } = req.body;
     
+    if (!email || !password) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Email and password are required'
+      });
+    }
+    
     // Find user by email and explicitly select password field
     const user = await User.findOne({ email }).select('+password');
     
     if (!user) {
-      const error = new Error('Invalid email or password');
-      error.statusCode = 401;
-      throw error;
+      return res.status(401).json({
+        status: 'error',
+        message: 'Invalid email or password'
+      });
     }
     
     // Compare passwords
     const isPasswordValid = await bcrypt.compare(password, user.password);
     
     if (!isPasswordValid) {
-      const error = new Error('Invalid email or password');
-      error.statusCode = 401;
-      throw error;
+      return res.status(401).json({
+        status: 'error',
+        message: 'Invalid email or password'
+      });
     }
     
     // Create a user object without sensitive information
@@ -324,13 +331,12 @@ export const signIn = async (req, res, next) => {
       }
     });
   } catch (error) {
+    console.error('Sign-in error:', error);
     next(error);
   }
 };
 
-/**
- * Request password reset controller
- */
+// Updated requestPasswordReset controller
 export const requestPasswordReset = async (req, res, next) => {
   try {
     const { email } = req.body;
@@ -345,41 +351,54 @@ export const requestPasswordReset = async (req, res, next) => {
       });
     }
     
-    // Generate reset token
-    const resetToken = crypto.randomBytes(32).toString('hex');
+    // Generate reset token - using a 6-digit code for easier user entry
+    const resetToken = Math.floor(100000 + Math.random() * 900000).toString();
     const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
     
     user.resetToken = resetToken;
     user.resetTokenExpiry = resetTokenExpiry;
     await user.save();
     
-    // In a real application, you would send an email with the reset token
-    
-    res.status(200).json({
-      status: 'success',
-      message: 'If your email is registered, you will receive a password reset link'
-    });
+    // Send email with reset token
+    try {
+      await emailService.sendVerificationCode(user.email, resetToken);
+      
+      return res.status(200).json({
+        success: true,
+        status: 'success',
+        message: 'Password reset instructions sent to your email'
+      });
+    } catch (emailError) {
+      console.error('Error sending reset email:', emailError);
+      return res.status(500).json({
+        success: false,
+        status: 'error',
+        message: 'Failed to send reset email. Please try again.'
+      });
+    }
   } catch (error) {
+    console.error('Request password reset error:', error);
     next(error);
   }
 };
 
-/**
- * Reset password controller
- */
+// Updated resetPassword controller
 export const resetPassword = async (req, res, next) => {
   try {
-    const { resetToken, newPassword } = req.body;
+    const { resetToken, email, newPassword } = req.body;
     
     const user = await User.findOne({
+      email,
       resetToken,
       resetTokenExpiry: { $gt: Date.now() }
     });
     
     if (!user) {
-      const error = new Error('Invalid or expired reset token');
-      error.statusCode = 400;
-      throw error;
+      return res.status(400).json({ 
+        success: false,
+        status: 'error',
+        message: 'Invalid or expired reset token' 
+      });
     }
     
     // Hash the new password
@@ -392,10 +411,52 @@ export const resetPassword = async (req, res, next) => {
     await user.save();
     
     res.status(200).json({
+      success: true,
       status: 'success',
       message: 'Password reset successfully'
     });
   } catch (error) {
+    console.error('Reset password error:', error);
+    next(error);
+  }
+};
+
+// Verify reset token endpoint to validate reset token before password reset
+export const verifyResetToken = async (req, res, next) => {
+  try {
+    const { email, resetToken } = req.body;
+    
+    if (!email || !resetToken) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Email and reset token are required' 
+      });
+    }
+    
+    console.log('Verifying token:', { email, resetToken }); // Debugging log
+    
+    const user = await User.findOne({
+      email,
+      resetToken,
+      resetTokenExpiry: { $gt: Date.now() }
+    });
+    
+    if (!user) {
+      console.log('User not found or token expired'); // Debugging log
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid or expired reset token' 
+      });
+    }
+    
+    console.log('Token verified successfully'); // Debugging log
+    
+    res.status(200).json({
+      success: true,
+      message: 'Token verified successfully'
+    });
+  } catch (error) {
+    console.error('Verify reset token error:', error);
     next(error);
   }
 };

@@ -34,7 +34,7 @@ const emailService = {
 
   sendVerificationCode: async (to, code) => {
     const subject = 'Email Verification Code';
-    const text = `Your verification code is: ${code}. This code will expire in 10 minutes.`;
+    const text = `Your authentication code is ${code}. This code will expire in 10 minutes.`;
 
     return emailService.sendEmail({ to, subject, text });
   },

@@ -1,5 +1,13 @@
 import express from 'express';
-import { signUp, verifyEmail, sendPhoneVerificationCode } from '../controllers/auth.controller.js';
+import { 
+    signUp, 
+    signIn, 
+    verifyEmail, 
+    sendPhoneVerificationCode,
+    requestPasswordReset,
+    resetPassword,
+    verifyResetToken
+} from '../controllers/auth.controller.js';
 
 
 const router = express.Router();
@@ -18,6 +26,8 @@ router.post('/sign-up', signUp);
  */
 router.post('/verify-email', verifyEmail);
 
+router.post('/resend-verification-email', (req, res) => console.log('hit'));
+
 /**
  * @route POST /api/auth/verify-phone
  * @desc Verify user's phone number in the process of signing up
@@ -30,26 +40,17 @@ router.post('/verify-phone', sendPhoneVerificationCode);
  * @desc Sign in an existing user
  * @access Public
  */
-router.post('/sign-in', (req, res) => {
-    console.log('Sign in route hit');
-});
+router.post('/sign-in', signIn);
 
 /**
- * @route POST /api/auth/forgot-password
+ * @route POST forgot password
  * @desc process user forgot password
  * @access Public
  */
-router.post('/forgot-password', (req, res) => {
-    console.log('forgot password route hit');
-});
+router.post('/request-password-reset', requestPasswordReset);
+router.post('/verify-reset-token', verifyResetToken);
+router.post('/reset-password', resetPassword);
 
-/**
- * @route POST /api/auth/reset-password
- * @desc Allow user to reset their password
- * @access Public
- */
-router.post('/reset-password', (req, res) => {
-    console.log('reset password route hit');
-});
+
 
 export default router;
