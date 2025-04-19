@@ -1,5 +1,15 @@
 // profile.controller.js
+import mongoose from 'mongoose';
 import Profile from '../models/profile.model.js';
+
+/**
+ * Validate ObjectId
+ * @param {string} id - ID to validate
+ * @returns {boolean} - Is valid ObjectId
+ */
+const isValidObjectId = (id) => {
+  return mongoose.Types.ObjectId.isValid(id);
+};
 
 /**
  * Create a new profile
@@ -8,7 +18,16 @@ import Profile from '../models/profile.model.js';
  */
 export const createProfile = async (req, res) => {
   try {
-    const userId = req.body.userId; // Get userId from request body
+    console.log("create profile hit!")
+    const userId = req.body.userId;
+
+    // Validate userId
+    if (!userId || !isValidObjectId(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID'
+      });
+    }
     
     // Check if profile already exists
     const existingProfile = await Profile.findOne({ user: userId });
@@ -20,38 +39,22 @@ export const createProfile = async (req, res) => {
     }
     
     // Parse arrays if they come as strings
-    const skills = req.body.skills && typeof req.body.skills === 'string' 
-      ? JSON.parse(req.body.skills) 
-      : req.body.skills || [];
-      
-    const expertise = req.body.expertise && typeof req.body.expertise === 'string' 
-      ? JSON.parse(req.body.expertise) 
-      : req.body.expertise || [];
-      
-    const certifications = req.body.certifications && typeof req.body.certifications === 'string' 
-      ? JSON.parse(req.body.certifications) 
-      : req.body.certifications || [];
-      
-    const workHistory = req.body.workHistory && typeof req.body.workHistory === 'string' 
-      ? JSON.parse(req.body.workHistory) 
-      : req.body.workHistory || [];
-      
-    const degrees = req.body.degrees && typeof req.body.degrees === 'string' 
-      ? JSON.parse(req.body.degrees) 
-      : req.body.degrees || [];
+    const skills = parseArrayField(req.body.skills);
+    const expertise = parseArrayField(req.body.expertise);
+    const certifications = parseArrayField(req.body.certifications);
+    const workHistory = parseArrayField(req.body.workHistory);
+    const degrees = parseArrayField(req.body.degrees);
     
-    // Handle profile image separately (simple base64 or URL string)
+    // Handle profile image (simple string)
     const profileImage = req.body.profileImage || '';
     
     // Create profile data
     const profileData = {
       user: userId,
-      firstName: req.body.firstName,
-      lastName: req.body.lastName,
-      bio: req.body.bio,
+      bio: req.body.bio || '',
       profileImage,
-      ratePerHour: req.body.ratePerHour,
-      primaryPosition: req.body.primaryPosition,
+      ratePerHour: req.body.ratePerHour || 0,
+      primaryPosition: req.body.primaryPosition || '',
       skills,
       expertise,
       certifications,
@@ -68,9 +71,10 @@ export const createProfile = async (req, res) => {
       message: 'Profile created successfully'
     });
   } catch (error) {
+    console.error('Create profile error:', error);
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message || 'Internal server error'
     });
   }
 };
@@ -82,10 +86,18 @@ export const createProfile = async (req, res) => {
  */
 export const updateProfile = async (req, res) => {
   try {
-    const profileId = req.params.id;
+    const userId = req.params.id;
+    
+    // Validate profileId
+    if (!userId || !isValidObjectId(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID'
+      });
+    }
     
     // Check if profile exists
-    let profile = await Profile.findById(profileId);
+    let profile = await Profile.findOne({user: userId});
     if (!profile) {
       return res.status(404).json({
         success: false,
@@ -94,30 +106,14 @@ export const updateProfile = async (req, res) => {
     }
     
     // Parse arrays if they come as strings
-    const skills = req.body.skills && typeof req.body.skills === 'string' 
-      ? JSON.parse(req.body.skills) 
-      : req.body.skills || profile.skills;
-      
-    const expertise = req.body.expertise && typeof req.body.expertise === 'string' 
-      ? JSON.parse(req.body.expertise) 
-      : req.body.expertise || profile.expertise;
-      
-    const certifications = req.body.certifications && typeof req.body.certifications === 'string' 
-      ? JSON.parse(req.body.certifications) 
-      : req.body.certifications || profile.certifications;
-      
-    const workHistory = req.body.workHistory && typeof req.body.workHistory === 'string' 
-      ? JSON.parse(req.body.workHistory) 
-      : req.body.workHistory || profile.workHistory;
-      
-    const degrees = req.body.degrees && typeof req.body.degrees === 'string' 
-      ? JSON.parse(req.body.degrees) 
-      : req.body.degrees || profile.degrees;
+    const skills = parseArrayField(req.body.skills) ?? profile.skills;
+    const expertise = parseArrayField(req.body.expertise) ?? profile.expertise;
+    const certifications = parseArrayField(req.body.certifications) ?? profile.certifications;
+    const workHistory = parseArrayField(req.body.workHistory) ?? profile.workHistory;
+    const degrees = parseArrayField(req.body.degrees) ?? profile.degrees;
     
     // Prepare update data
     const updateData = {
-      firstName: req.body.firstName || profile.firstName,
-      lastName: req.body.lastName || profile.lastName,
       bio: req.body.bio || profile.bio,
       ratePerHour: req.body.ratePerHour || profile.ratePerHour,
       primaryPosition: req.body.primaryPosition || profile.primaryPosition,
@@ -135,8 +131,8 @@ export const updateProfile = async (req, res) => {
     }
     
     // Update profile
-    profile = await Profile.findByIdAndUpdate(
-      profileId, 
+    profile = await Profile.findOneAndUpdate(
+    { user: userId }, 
       { $set: updateData },
       { new: true, runValidators: true }
     );
@@ -147,27 +143,28 @@ export const updateProfile = async (req, res) => {
       message: 'Profile updated successfully'
     });
   } catch (error) {
+    console.error('Update profile error:', error);
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message || 'Internal server error'
     });
   }
 };
 
 /**
- * Get current user's profile
- * @route GET /api/profile/me
+ * Get profile by user ID
+ * @route GET /api/profile/:userId
  * @access Public
  */
-export const getMyProfile = async (req, res) => {
+export const getProfileByUserId = async (req, res) => {
   try {
-    // Get userId from query parameter
-    const userId = req.query.userId;
+    const userId = req.params.userId;
     
-    if (!userId) {
+    // Validate userId
+    if (!userId || !isValidObjectId(userId)) {
       return res.status(400).json({
         success: false,
-        message: 'User ID is required'
+        message: 'Invalid user ID'
       });
     }
     
@@ -185,21 +182,94 @@ export const getMyProfile = async (req, res) => {
       data: profile
     });
   } catch (error) {
+    console.error('Get profile error:', error);
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message || 'Internal server error'
     });
   }
 };
 
 /**
- * Get profile by user ID
- * @route GET /api/profile/:userId
+ * Delete profile
+ * @route DELETE /api/profile/delete/:id
  * @access Public
  */
-export const getProfileByUserId = async (req, res) => {
+export const deleteProfile = async (req, res) => {
   try {
-    const profile = await Profile.findOne({ user: req.params.userId });
+    
+    const userId = req.params.id;
+    
+    // Validate profileId
+    if (!userId || !isValidObjectId(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID'
+      });
+    }
+    
+    const profile = await Profile.findOne({user: userId});
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        message: 'Profile not found'
+      });
+    }
+    
+    await Profile.findOneAndDelete({user: userId});
+    
+    res.status(200).json({
+      success: true,
+      message: 'Profile deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Internal server error'
+    });
+  }
+};
+
+/**
+ * Helper function to parse array fields that may come as strings
+ * @param {string|array} field - Field to parse
+ * @returns {array} - Parsed array or empty array
+ */
+const parseArrayField = (field) => {
+  if (!field) return [];
+  
+  if (typeof field === 'string') {
+    try {
+      return JSON.parse(field);
+    } catch (e) {
+      console.error('Error parsing field:', e);
+      return [];
+    }
+  }
+  
+  return field;
+};
+
+/**
+ * Get current user's profile (included for compatibility with frontend)
+ * Note: This is essentially the same as getProfileByUserId but uses query parameter
+ * @route GET /api/profile/me
+ * @access Public
+ */
+export const getMyProfile = async (req, res) => {
+  try {
+    // Get userId from query parameter
+    const userId = req.query.userId;
+    
+    if (!userId || !isValidObjectId(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID'
+      });
+    }
+    
+    const profile = await Profile.findOne({ user: userId });
     
     if (!profile) {
       return res.status(404).json({
@@ -213,40 +283,10 @@ export const getProfileByUserId = async (req, res) => {
       data: profile
     });
   } catch (error) {
+    console.error('Get profile error:', error);
     res.status(500).json({
       success: false,
-      message: error.message
-    });
-  }
-};
-
-/**
- * Delete profile
- * @route DELETE /api/profile/delete/:id
- * @access Public
- */
-export const deleteProfile = async (req, res) => {
-  try {
-    const profileId = req.params.id;
-    
-    const profile = await Profile.findById(profileId);
-    if (!profile) {
-      return res.status(404).json({
-        success: false,
-        message: 'Profile not found'
-      });
-    }
-    
-    await Profile.findByIdAndDelete(profileId);
-    
-    res.status(200).json({
-      success: true,
-      message: 'Profile deleted successfully'
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
+      message: error.message || 'Internal server error'
     });
   }
 };
@@ -278,8 +318,6 @@ export const searchProfiles = async (req, res) => {
     // Text search across multiple fields
     if (query) {
       searchCriteria.$or = [
-        { firstName: { $regex: query, $options: 'i' } },
-        { lastName: { $regex: query, $options: 'i' } },
         { primaryPosition: { $regex: query, $options: 'i' } },
         { bio: { $regex: query, $options: 'i' } }
       ];
@@ -301,9 +339,10 @@ export const searchProfiles = async (req, res) => {
       data: profiles
     });
   } catch (error) {
+    console.error('Search profiles error:', error);
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message || 'Internal server error'
     });
   }
 };
@@ -323,9 +362,10 @@ export const getAllSkills = async (req, res) => {
       data: skills
     });
   } catch (error) {
+    console.error('Get skills error:', error);
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message || 'Internal server error'
     });
   }
 };
@@ -345,9 +385,10 @@ export const getAllExpertise = async (req, res) => {
       data: expertise
     });
   } catch (error) {
+    console.error('Get expertise error:', error);
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message || 'Internal server error'
     });
   }
 };
@@ -367,9 +408,10 @@ export const getAllCertifications = async (req, res) => {
       data: certifications
     });
   } catch (error) {
+    console.error('Get certifications error:', error);
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message || 'Internal server error'
     });
   }
 };

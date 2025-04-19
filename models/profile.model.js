@@ -1,8 +1,13 @@
+// Updated profile.model.js
 import mongoose from 'mongoose';
 const { Schema } = mongoose;
 
 // Work history schema
 const WorkHistorySchema = new Schema({
+  id: {
+    type: String,
+    required: true
+  },
   title: {
     type: String,
     trim: true
@@ -36,6 +41,10 @@ const WorkHistorySchema = new Schema({
 
 // Degree schema
 const DegreeSchema = new Schema({
+  id: {
+    type: String,
+    required: true
+  },
   degree: {
     type: String,
     trim: true
@@ -56,16 +65,6 @@ const profileSchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: 'User',
     required: [true, 'Profile must belong to a user']
-  },
-  firstName: {
-    type: String,
-    required: [true, 'Please provide your first name'],
-    trim: true
-  },
-  lastName: {
-    type: String,
-    required: [true, 'Please provide your last name'],
-    trim: true
   },
   bio: {
     type: String,
@@ -106,10 +105,6 @@ profileSchema.index({ skills: 1 });
 profileSchema.index({ expertise: 1 });
 profileSchema.index({ certifications: 1 });
 
-// Virtual for full name
-profileSchema.virtual('fullName').get(function() {
-  return `${this.firstName} ${this.lastName}`;
-});
 
 // Document middleware: runs before .save() and .create()
 profileSchema.pre('save', function(next) {
