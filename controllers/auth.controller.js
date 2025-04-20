@@ -55,6 +55,8 @@ export const signUp = async (req, res, next) => {
         status: 'success',
         message: 'User registered successfully. Please verify your email.',
         data: {
+          name: userData.name,
+          role: userData.role,
           userId: userData._id,
           email: userData.email,
           phoneNumber: userData.phoneNumber

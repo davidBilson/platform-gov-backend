@@ -1,6 +1,8 @@
 import cors from 'cors';
 import express from 'express';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 // routes
 import routes from './routes/index.js'; //default route (second entry points)
 // import { notFoundHandler, errorHandler } from './middleware/errorHandlers.middleware.js';
@@ -31,6 +33,11 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // serve static files from uploads directory
 
 // ROUTES
 app.use('/api', routes); //single entry point

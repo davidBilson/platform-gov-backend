@@ -1,6 +1,13 @@
 import mongoose from 'mongoose';
 import Profile from '../models/profile.model.js';
 
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 /**
  * Validate ObjectId
  * @param {string} id - ID to validate
@@ -120,7 +127,6 @@ export const getProfileByUserId = async (req, res) => {
     }
   };
   
-
   export const updateProfile = async (req, res) => {
     try {
       const userId = req.params.id;
@@ -171,6 +177,29 @@ export const getProfileByUserId = async (req, res) => {
         updatedAt: Date.now()
       };
       
+      // Handle profile image replacement
+      if (req.body.profileImage && profile.profileImage && 
+          req.body.profileImage !== profile.profileImage && 
+          !req.body.profileImage.startsWith('blob:')) {
+        try {
+          // Get the old image filename from the path
+          const oldImagePath = profile.profileImage;
+          if (oldImagePath && oldImagePath.includes('/uploads/profiles/')) {
+            const oldFilename = oldImagePath.split('/uploads/profiles/')[1];
+            const fullPath = path.join(__dirname, '..', 'uploads', 'profiles', oldFilename);
+            
+            // Check if file exists before deleting
+            if (fs.existsSync(fullPath)) {
+              fs.unlinkSync(fullPath);
+              console.log('Deleted old profile image:', oldFilename);
+            }
+          }
+        } catch (deleteErr) {
+          console.error('Error deleting old profile image:', deleteErr);
+          // Continue with update even if delete fails
+        }
+      }
+      
       // Update profile image if provided
       if (req.body.profileImage) {
         updateData.profileImage = req.body.profileImage;
@@ -195,7 +224,7 @@ export const getProfileByUserId = async (req, res) => {
       });
     }
   };
-
+  
 export const deleteProfile = async (req, res) => {
   try {
     const userId = req.params.id;
