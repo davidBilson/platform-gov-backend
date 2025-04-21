@@ -1,11 +1,19 @@
 // profile.routes.js
 import express from 'express';
 import {
-    createProfile,
-    updateProfile,
-    getProfileByUserId,
-    deleteProfile
-} from '../controllers/profile.controller.js';
+    createFreelancerProfile,
+    updateFreelancerProfile,
+    getFreelancerProfile,
+    deleteFreelancerProfile
+} from '../controllers/profile.freelancer.controller.js';
+
+import {
+    createBusinessProfile,
+    updateBusinessProfile,
+    getBusinessProfile,
+    deleteBusinessProfile
+} from '../controllers/profile.business.controller.js';
+
 import { upload } from '../middleware/multer-image-upload.js';
 
 import { uploadImage } from '../utils/cloudinary.js';
@@ -13,13 +21,23 @@ import { uploadImage } from '../utils/cloudinary.js';
 const router = express.Router();
 
 // Routes
-router.post('/create', createProfile);
 
-router.get('/:id', getProfileByUserId);
+router.post('/create-business-profile', createBusinessProfile);
 
-router.put('/update/:id', updateProfile);
+router.get('/fetch-business-profile/:id', getBusinessProfile);
 
-router.delete('/delete/:id', deleteProfile);
+router.put('/update-business-profile/:id', updateBusinessProfile);
+
+router.delete('/delete-business-profile/:id', deleteBusinessProfile);
+
+
+router.post('/create-freelancer-profile', createFreelancerProfile);
+
+router.get('/fetch-freelancer-profile/:id', getFreelancerProfile);
+
+router.put('/update-freelancer-profile/:id', updateFreelancerProfile);
+
+router.delete('/delete-freelancer-profile/:id', deleteFreelancerProfile);
 
 // Image upload route
 

@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import Profile from '../models/profile.model.js';
+import Profile from '../models/profile.freelancer.model.js';
 import { deleteImage, getPublicIdFromUrl } from '../utils/cloudinary.js';
 
 /**
@@ -41,7 +41,7 @@ const parseArrayField = (field) => {
  * @route GET /api/profile/:userId
  * @access Public
  */
-export const getProfileByUserId = async (req, res) => {
+export const getFreelancerProfile = async (req, res) => {
   try {
     const userId = req.params.id;
     
@@ -86,7 +86,7 @@ export const getProfileByUserId = async (req, res) => {
  * @route POST /api/profile
  * @access Private
  */
-export const createProfile = async (req, res) => {
+export const createFreelancerProfile = async (req, res) => {
   try {
     const userId = req.body.userId;
 
@@ -155,7 +155,7 @@ export const createProfile = async (req, res) => {
  * @route PUT /api/profile/:id
  * @access Private
  */
-export const updateProfile = async (req, res) => {
+export const updateFreelancerProfile = async (req, res) => {
   try {
     const userId = req.params.id;
     
@@ -255,7 +255,7 @@ export const updateProfile = async (req, res) => {
  * @route DELETE /api/profile/:id
  * @access Private
  */
-export const deleteProfile = async (req, res) => {
+export const deleteFreelancerProfile = async (req, res) => {
   try {
     const userId = req.params.id;
     
@@ -310,7 +310,7 @@ export const deleteProfile = async (req, res) => {
 
 /**
  * Get current user's profile (included for compatibility with frontend)
- * Note: This is essentially the same as getProfileByUserId but uses query parameter
+ * Note: This is essentially the same as getFreelancerProfile but uses query parameter
  * @route GET /api/profile/me
  * @access Public
  */
