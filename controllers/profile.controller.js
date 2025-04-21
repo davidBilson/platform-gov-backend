@@ -1,12 +1,6 @@
 import mongoose from 'mongoose';
 import Profile from '../models/profile.model.js';
-
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { deleteImage, getPublicIdFromUrl } from '../utils/cloudinary.js';
 
 /**
  * Validate ObjectId
@@ -18,213 +12,249 @@ const isValidObjectId = (id) => {
 };
 
 /**
- * Get profile by user ID with comprehensive debugging
+ * Convert ID to ObjectId if valid
+ * @param {string} id - ID to convert
+ * @returns {ObjectId|null} - Mongoose ObjectId or null if invalid
+ */
+const toObjectId = (id) => {
+  if (!id || !isValidObjectId(id)) return null;
+  return new mongoose.Types.ObjectId(id.toString());
+};
+
+/**
+ * Parse array field from request
+ * @param {string|Array} field - Field to parse
+ * @returns {Array} - Parsed array
+ */
+const parseArrayField = (field) => {
+  if (!field) return [];
+  if (Array.isArray(field)) return field;
+  try {
+    return JSON.parse(field);
+  } catch (e) {
+    return [field]; // Return as single item array if not JSON parseable
+  }
+};
+
+/**
+ * Get profile by user ID
  * @route GET /api/profile/:userId
  * @access Public
  */
 export const getProfileByUserId = async (req, res) => {
-    try {
-      const userId = req.params.id;
-      
-      // First check if the ID is valid
-      if (!userId || !isValidObjectId(userId)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid user ID'
-        });
-      }
-      
-      // Try string match first (in case the model expects string IDs)
-      let profile = await Profile.findOne({ user: userId });
-      
-      // If not found, try with ObjectId
-      if (!profile) {
-        const objectId = new mongoose.Types.ObjectId(userId.toString());
-        profile = await Profile.findOne({ user: objectId });
-      }
-      
-      if (!profile) {
-        return res.status(404).json({
-          success: false,
-          message: 'Profile not found'
-        });
-      }
-      
-      res.status(200).json({
-        success: true,
-        data: profile
-      });
-    } catch (error) {
-      res.status(500).json({
+  try {
+    const userId = req.params.id;
+    
+    // First check if the ID is valid
+    if (!userId || !isValidObjectId(userId)) {
+      return res.status(400).json({
         success: false,
-        message: error.message || 'Internal server error'
+        message: 'Invalid user ID'
       });
     }
-  };
-
-
-  export const createProfile = async (req, res) => {
-    try {
-      const userId = req.body.userId;
-  
-      // Validate userId
-      if (!userId || !isValidObjectId(userId)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid user ID'
-        });
-      }
-      
-      // Convert to ObjectId
+    
+    // Try string match first (in case the model expects string IDs)
+    let profile = await Profile.findOne({ user: userId });
+    
+    // If not found, try with ObjectId
+    if (!profile) {
       const objectId = new mongoose.Types.ObjectId(userId.toString());
-      
-      // Check if profile already exists
-      const existingProfile = await Profile.findOne({ user: objectId });
-      if (existingProfile) {
-        return res.status(400).json({
-          success: false,
-          message: 'Profile already exists for this user. Use update instead.'
-        });
-      }
-      
-      // Parse arrays if they come as strings
-      const skills = parseArrayField(req.body.skills);
-      const expertise = parseArrayField(req.body.expertise);
-      const certifications = parseArrayField(req.body.certifications);
-      const workHistory = parseArrayField(req.body.workHistory);
-      const degrees = parseArrayField(req.body.degrees);
-      
-      // Handle profile image (simple string)
-      const profileImage = req.body.profileImage || '';
-      
-      // Create profile data
-      const profileData = {
-        user: objectId,
-        bio: req.body.bio || '',
-        profileImage,
-        ratePerHour: req.body.ratePerHour || 0,
-        primaryPosition: req.body.primaryPosition || '',
-        skills,
-        expertise,
-        certifications,
-        workHistory,
-        degrees
-      };
-      
-      // Create new profile
-      const profile = await Profile.create(profileData);
-      
-      res.status(201).json({
-        success: true,
-        data: profile,
-        message: 'Profile created successfully'
-      });
-    } catch (error) {
-      res.status(500).json({
+      profile = await Profile.findOne({ user: objectId });
+    }
+    
+    if (!profile) {
+      return res.status(404).json({
         success: false,
-        message: error.message || 'Internal server error'
+        message: 'Profile not found'
       });
     }
-  };
-  
-  export const updateProfile = async (req, res) => {
-    try {
-      const userId = req.params.id;
-      
-      // Validate userId
-      if (!userId || !isValidObjectId(userId)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid user ID'
-        });
-      }
-      
-      // Convert to ObjectId
-      const objectId = new mongoose.Types.ObjectId(userId.toString());
-      
-      // Check if profile exists
-      let profile = await Profile.findOne({ user: objectId });
-      
-      // If not found, try with string ID as fallback
-      if (!profile) {
-        profile = await Profile.findOne({ user: userId });
-      }
-      
-      if (!profile) {
-        return res.status(404).json({
-          success: false,
-          message: 'Profile not found'
-        });
-      }
-      
-      // Parse arrays if they come as strings
-      const skills = parseArrayField(req.body.skills) ?? profile.skills;
-      const expertise = parseArrayField(req.body.expertise) ?? profile.expertise;
-      const certifications = parseArrayField(req.body.certifications) ?? profile.certifications;
-      const workHistory = parseArrayField(req.body.workHistory) ?? profile.workHistory;
-      const degrees = parseArrayField(req.body.degrees) ?? profile.degrees;
-      
-      // Prepare update data
-      const updateData = {
-        bio: req.body.bio || profile.bio,
-        ratePerHour: req.body.ratePerHour || profile.ratePerHour,
-        primaryPosition: req.body.primaryPosition || profile.primaryPosition,
-        skills,
-        expertise,
-        certifications,
-        workHistory,
-        degrees,
-        updatedAt: Date.now()
-      };
-      
-      // Handle profile image replacement
-      if (req.body.profileImage && profile.profileImage && 
-          req.body.profileImage !== profile.profileImage && 
-          !req.body.profileImage.startsWith('blob:')) {
-        try {
-          // Get the old image filename from the path
-          const oldImagePath = profile.profileImage;
-          if (oldImagePath && oldImagePath.includes('/uploads/profiles/')) {
-            const oldFilename = oldImagePath.split('/uploads/profiles/')[1];
-            const fullPath = path.join(__dirname, '..', 'uploads', 'profiles', oldFilename);
-            
-            // Check if file exists before deleting
-            if (fs.existsSync(fullPath)) {
-              fs.unlinkSync(fullPath);
-              console.log('Deleted old profile image:', oldFilename);
-            }
+    
+    res.status(200).json({
+      success: true,
+      data: profile
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Internal server error'
+    });
+  }
+};
+
+/**
+ * Create a new profile
+ * @route POST /api/profile
+ * @access Private
+ */
+export const createProfile = async (req, res) => {
+  try {
+    const userId = req.body.userId;
+
+    // Validate userId
+    if (!userId || !isValidObjectId(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID'
+      });
+    }
+    
+    // Convert to ObjectId
+    const objectId = new mongoose.Types.ObjectId(userId.toString());
+    
+    // Check if profile already exists
+    const existingProfile = await Profile.findOne({ user: objectId });
+    if (existingProfile) {
+      return res.status(400).json({
+        success: false,
+        message: 'Profile already exists for this user. Use update instead.'
+      });
+    }
+    
+    // Parse arrays if they come as strings
+    const skills = parseArrayField(req.body.skills);
+    const expertise = parseArrayField(req.body.expertise);
+    const certifications = parseArrayField(req.body.certifications);
+    const workHistory = parseArrayField(req.body.workHistory);
+    const degrees = parseArrayField(req.body.degrees);
+    
+    // Handle profile image
+    const profileImage = req.body.profileImage || '';
+    
+    // Create profile data
+    const profileData = {
+      user: objectId,
+      bio: req.body.bio || '',
+      profileImage,
+      ratePerHour: req.body.ratePerHour || 0,
+      primaryPosition: req.body.primaryPosition || '',
+      skills,
+      expertise,
+      certifications,
+      workHistory,
+      degrees
+    };
+    
+    // Create new profile
+    const profile = await Profile.create(profileData);
+    
+    res.status(201).json({
+      success: true,
+      data: profile,
+      message: 'Profile created successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Internal server error'
+    });
+  }
+};
+
+/**
+ * Update a profile
+ * @route PUT /api/profile/:id
+ * @access Private
+ */
+export const updateProfile = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    
+    // Validate userId
+    if (!userId || !isValidObjectId(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID'
+      });
+    }
+    
+    // Convert to ObjectId
+    const objectId = new mongoose.Types.ObjectId(userId.toString());
+    
+    // Check if profile exists
+    let profile = await Profile.findOne({ user: objectId });
+    
+    // If not found, try with string ID as fallback
+    if (!profile) {
+      profile = await Profile.findOne({ user: userId });
+    }
+    
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        message: 'Profile not found'
+      });
+    }
+    
+    // Parse arrays if they come as strings
+    const skills = parseArrayField(req.body.skills) ?? profile.skills;
+    const expertise = parseArrayField(req.body.expertise) ?? profile.expertise;
+    const certifications = parseArrayField(req.body.certifications) ?? profile.certifications;
+    const workHistory = parseArrayField(req.body.workHistory) ?? profile.workHistory;
+    const degrees = parseArrayField(req.body.degrees) ?? profile.degrees;
+    
+    // Prepare update data
+    const updateData = {
+      bio: req.body.bio || profile.bio,
+      ratePerHour: req.body.ratePerHour || profile.ratePerHour,
+      primaryPosition: req.body.primaryPosition || profile.primaryPosition,
+      skills,
+      expertise,
+      certifications,
+      workHistory,
+      degrees,
+      updatedAt: Date.now()
+    };
+    
+    // Handle profile image replacement
+    if (req.body.profileImage && profile.profileImage && 
+        req.body.profileImage !== profile.profileImage) {
+      try {
+        // Delete the old image from Cloudinary if it's a Cloudinary URL
+        if (profile.profileImage.includes('cloudinary.com')) {
+          const publicId = getPublicIdFromUrl(profile.profileImage);
+          if (publicId) {
+            await deleteImage(publicId).catch(err => {
+              console.error('Error deleting old image from Cloudinary:', err);
+              // Continue even if delete fails
+            });
           }
-        } catch (deleteErr) {
-          console.error('Error deleting old profile image:', deleteErr);
-          // Continue with update even if delete fails
         }
+      } catch (deleteErr) {
+        console.error('Error handling old profile image:', deleteErr);
+        // Continue with update even if delete fails
       }
-      
-      // Update profile image if provided
-      if (req.body.profileImage) {
-        updateData.profileImage = req.body.profileImage;
-      }
-      
-      // Update profile
-      profile = await Profile.findOneAndUpdate(
-        { user: objectId }, 
-        { $set: updateData },
-        { new: true, runValidators: true }
-      );
-      
-      res.status(200).json({
-        success: true,
-        data: profile,
-        message: 'Profile updated successfully'
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: error.message || 'Internal server error'
-      });
     }
-  };
-  
+    
+    // Update profile image if provided
+    if (req.body.profileImage) {
+      updateData.profileImage = req.body.profileImage;
+    }
+    
+    // Update profile
+    profile = await Profile.findOneAndUpdate(
+      { user: objectId }, 
+      { $set: updateData },
+      { new: true, runValidators: true }
+    );
+    
+    res.status(200).json({
+      success: true,
+      data: profile,
+      message: 'Profile updated successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Internal server error'
+    });
+  }
+};
+
+/**
+ * Delete a profile
+ * @route DELETE /api/profile/:id
+ * @access Private
+ */
 export const deleteProfile = async (req, res) => {
   try {
     const userId = req.params.id;
@@ -248,6 +278,22 @@ export const deleteProfile = async (req, res) => {
       });
     }
     
+    // If profile has an image on Cloudinary, delete it
+    if (profile.profileImage && profile.profileImage.includes('cloudinary.com')) {
+      try {
+        const publicId = getPublicIdFromUrl(profile.profileImage);
+        if (publicId) {
+          await deleteImage(publicId).catch(err => {
+            console.error('Error deleting profile image from Cloudinary:', err);
+            // Continue even if delete fails
+          });
+        }
+      } catch (error) {
+        console.error('Error handling profile image deletion:', error);
+        // Continue with deletion even if image delete fails
+      }
+    }
+    
     await Profile.findOneAndDelete({ user: userObjectId });
     
     res.status(200).json({
@@ -260,26 +306,6 @@ export const deleteProfile = async (req, res) => {
       message: error.message || 'Internal server error'
     });
   }
-};
-
-/**
- * Helper function to parse array fields that may come as strings
- * @param {string|array} field - Field to parse
- * @returns {array} - Parsed array or empty array
- */
-const parseArrayField = (field) => {
-  if (!field) return [];
-  
-  if (typeof field === 'string') {
-    try {
-      return JSON.parse(field);
-    } catch (e) {
-      console.error('Error parsing field:', e);
-      return [];
-    }
-  }
-  
-  return field;
 };
 
 /**

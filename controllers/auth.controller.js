@@ -117,6 +117,7 @@ export const verifyEmail = async (req, res, next) => {
 
 export const sendPhoneVerificationCode = async (req, res, next) => {
   try {
+    console.log("Sending phone verification code...");
     const { userId } = req.body;
     
     const user = await User.findById(userId);
@@ -150,6 +151,7 @@ export const sendPhoneVerificationCode = async (req, res, next) => {
       status: 'success',
       message: 'Verification code sent to your phone number'
     });
+    console.log("Phone verification code sent successfully");
   } catch (error) {
     next(error);
   }
