@@ -1,6 +1,10 @@
 import mongoose from 'mongoose';
 
 const milestoneSchema = new mongoose.Schema({
+  id: {
+    type: Number,
+    required: true
+  },
   description: {
     type: String,
     required: true,
@@ -13,7 +17,7 @@ const milestoneSchema = new mongoose.Schema({
   },
   dueDate: {
     type: Date,
-    required: true
+    default: null
   }
 });
 
@@ -82,7 +86,23 @@ const jobSchema = new mongoose.Schema({
   },
   startDate: {
     type: Date,
-    required: true
+    default: null
+  },
+  // New fields for retainer payment type
+  retainerAmount: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  retainerFrequency: {
+    type: String,
+    enum: ['Hour', 'Day', 'Week', 'Month'],
+    default: 'Week'
+  },
+  retainerDuration: {
+    type: Number,
+    min: 1,
+    default: 1
   },
   status: {
     type: String,

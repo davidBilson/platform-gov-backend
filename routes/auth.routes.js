@@ -12,7 +12,6 @@ import {
     verifyResetToken
 } from '../controllers/auth.controller.js';
 
-
 const router = express.Router();
 
 router.post('/sign-up', signUp);
@@ -34,7 +33,5 @@ router.post('/request-password-reset', requestPasswordReset);
 router.post('/verify-reset-token', verifyResetToken);
 
 router.post('/reset-password', resetPassword);
-
-
 
 export default router;

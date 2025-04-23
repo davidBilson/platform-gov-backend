@@ -1,6 +1,5 @@
 import User from '../models/user.model.js';
 import bcrypt from 'bcrypt';
-import crypto from 'crypto';
 import twilio from '../utils/twilio.js';
 import emailService from '../utils/nodemailer.js';
 
