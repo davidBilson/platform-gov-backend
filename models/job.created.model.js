@@ -1,5 +1,32 @@
 import mongoose from 'mongoose';
 
+const locationSchema = new mongoose.Schema({
+  country: {
+    type: String,
+    trim: true
+  },
+  address1: {
+    type: String,
+    trim: true
+  },
+  address2: {
+    type: String,
+    trim: true
+  },
+  city: {
+    type: String,
+    trim: true
+  },
+  state: {
+    type: String,
+    trim: true
+  },
+  zipCode: {
+    type: String,
+    trim: true
+  }
+});
+
 const milestoneSchema = new mongoose.Schema({
   id: {
     type: Number,
@@ -27,10 +54,38 @@ const jobSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  // Added client information fields
+  clientName: {
+    type: String,
+    trim: true
+  },
+  clientLogo: {
+    type: String,
+    trim: true
+  },
+  clientIndustry: {
+    type: String,
+    trim: true
+  },
+  clientCompanySize: {
+    type: String,
+    trim: true
+  },
+  clientSpecializations: {
+    type: [String],
+    default: []
+  },
+  clientLocation: {
+    type: [locationSchema],
+    default: []
+  },
+  clientAccountAge: {
+    type: Date
+  },
   userRole: {
     type: String,
     required: true,
-    enum: ['business', 'individual', 'admin'],
+    enum: ['client', 'admin'],
     default: 'business'
   },
   location: {
@@ -125,6 +180,6 @@ jobSchema.pre('save', function(next) {
   next();
 });
 
-const Job = mongoose.model('Job', jobSchema);
+const Job = mongoose.model('Jobs', jobSchema);
 
 export default Job;

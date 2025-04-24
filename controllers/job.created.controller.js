@@ -50,14 +50,10 @@ const verifyUserRole = async (userId) => {
   
   // Check if user has a business profile
   const businessProfile = await BusinessProfile.findOne({ user: objectId });
-  
+
   if (businessProfile) {
-    return { hasValidRole: true, role: 'business', profile: businessProfile };
+    return { hasValidRole: true, role: 'client', profile: businessProfile,  };
   }
-  
-  // For this controller, we're assuming that if no business profile exists,
-  // the user is an individual (you may want to adapt this based on your user model)
-  return { hasValidRole: true, role: 'individual', profile: null };
 };
 
 /**
@@ -286,7 +282,14 @@ export const createJob = async (req, res) => {
     // Create job data object
     const jobData = {
       userId: toObjectId(userId),
-      userRole: role, // Set the role based on verification
+      clientName: profile.name,
+      clientLogo: profile.logo,
+      clientIndustry: profile.industry,
+      clientCompanySize: profile.size,
+      clientSpecializations: profile.specializations,
+      clientLocation: profile.locations,
+      clientAccountAge: profile.createdAt,
+      userRole: role,
       location: req.body.location,
       jobCategory: req.body.jobCategory,
       jobTitle: req.body.jobTitle,
@@ -321,7 +324,6 @@ export const createJob = async (req, res) => {
       data: job,
       message: 'Job created successfully'
     });
-    console.log('Job created successfully:', job);
   } catch (error) {
     res.status(500).json({
       success: false,
