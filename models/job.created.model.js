@@ -86,7 +86,7 @@ const jobSchema = new mongoose.Schema({
     type: String,
     required: true,
     enum: ['client', 'admin'],
-    default: 'business'
+    default: 'client'
   },
   location: {
     type: String,

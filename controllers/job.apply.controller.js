@@ -8,7 +8,7 @@ import path from 'path';
 import fs from 'fs';
 import jwt from 'jsonwebtoken';
 
-// Authentication middleware - implemented directly in this file
+// Authentication middleware
 const authMiddleware = async (req, res, next) => {
   try {
     // Get token from header
@@ -41,7 +41,7 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
-// File upload configuration - implemented directly in this file
+// File upload configuration
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = path.join(process.cwd(), 'uploads', 'job-applications');
@@ -93,30 +93,26 @@ const upload = multer({
 });
 
 // Process uploaded files
-const processUploadedFiles = (files) => {
-  if (!files || files.length === 0) return [];
+const processUploadedFile = (file) => {
+  if (!file) return null;
   
-  return files.map(file => ({
+  return {
     filename: file.filename,
     originalName: file.originalname,
     fileSize: file.size,
     fileType: file.mimetype,
     fileUrl: `/uploads/job-applications/${file.filename}`
-  }));
+  };
 };
 
-// Submit or save draft application
-export const createOrUpdateJobApplication = async (req, res) => {
+// Submit job application
+export const createJobApplication = async (req, res) => {
   try {
-    const { jobId } = req.params;
-    const freelancerId = req.user.id;
-    const {
-      coverLetter,
-      proposedRate,
-      certificationAcknowledgment,
-      saveAsDraft = false
-    } = req.body;
-
+    const { jobId, userId, coverLetter, proposedRate, acknowledgment } = req.body;
+    
+    // Convert acknowledgment string to boolean if needed
+    const certificationAcknowledgment = acknowledgment === 'true' || acknowledgment === true;
+    
     // Validate job exists
     const job = await Job.findById(jobId);
     if (!job) {
@@ -124,114 +120,60 @@ export const createOrUpdateJobApplication = async (req, res) => {
     }
 
     // Check if job is still active
-    if (job.status !== 'active' && !saveAsDraft) {
+    if (job.status !== 'active') {
       return res.status(400).json({ success: false, message: 'This job is no longer accepting applications' });
     }
 
-    // Check if user is a freelancer
-    if (req.user.role !== 'freelancer') {
-      return res.status(403).json({ success: false, message: 'Only freelancers can apply to jobs' });
-    }
-
-    // Check if freelancer already applied to this job
-    let application = await JobApplication.findOne({ 
+    // Check if user already applied to this job
+    const existingApplication = await JobApplication.findOne({ 
       jobId, 
-      freelancerId
+      freelancerId: userId
     });
 
-    // Process file uploads if they exist
+    if (existingApplication) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'You have already applied to this job' 
+      });
+    }
+
+    // Get freelancer profile ID
+    const contractorProfile = await mongoose.model('ContractorProfile').findOne({ user: userId });
+    if (!contractorProfile) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'You must complete your freelancer profile before applying to jobs' 
+      });
+    }
+
+    // Process file upload if it exists
     let attachments = [];
-    if (req.files && req.files.length > 0) {
-      attachments = processUploadedFiles(req.files);
+    if (req.file) {
+      const fileData = processUploadedFile(req.file);
+      if (fileData) {
+        attachments.push(fileData);
+      }
     }
 
-    const status = saveAsDraft ? 'draft' : 'pending';
-
-    if (application) {
-      // Update existing application
-      
-      // If transitioning from draft to submitted, validate required fields
-      if (application.status === 'draft' && status === 'pending') {
-        if (!coverLetter) {
-          return res.status(400).json({ success: false, message: 'Cover letter is required' });
-        }
-        if (!proposedRate) {
-          return res.status(400).json({ success: false, message: 'Proposed rate is required' });
-        }
-        if (!certificationAcknowledgment) {
-          return res.status(400).json({ 
-            success: false, 
-            message: 'You must acknowledge that you have the required certifications and security clearances' 
-          });
-        }
-      }
-      
-      // Keep existing attachments and add new ones if any
-      const updatedAttachments = [...application.attachments];
-      if (attachments.length > 0) {
-        updatedAttachments.push(...attachments);
-      }
-
-      application.coverLetter = coverLetter || application.coverLetter;
-      application.proposedRate = proposedRate || application.proposedRate;
-      application.certificationAcknowledgment = certificationAcknowledgment ?? application.certificationAcknowledgment;
-      application.attachments = updatedAttachments;
-      application.status = status;
-      
-      await application.save();
-      
-      return res.status(200).json({
-        success: true,
-        message: saveAsDraft ? 'Application draft updated' : 'Application updated and submitted',
-        data: application
-      });
-    } else {
-      // Create new application
-      
-      // If not a draft, validate required fields
-      if (!saveAsDraft) {
-        if (!coverLetter) {
-          return res.status(400).json({ success: false, message: 'Cover letter is required' });
-        }
-        if (!proposedRate) {
-          return res.status(400).json({ success: false, message: 'Proposed rate is required' });
-        }
-        if (!certificationAcknowledgment) {
-          return res.status(400).json({ 
-            success: false, 
-            message: 'You must acknowledge that you have the required certifications and security clearances' 
-          });
-        }
-      }
-      
-      // Get freelancer profile ID
-      const freelancerProfile = await mongoose.model('FreelancerProfile').findOne({ user: freelancerId });
-      if (!freelancerProfile && !saveAsDraft) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'You must complete your freelancer profile before applying to jobs' 
-        });
-      }
-
-      application = new JobApplication({
-        jobId,
-        freelancerId,
-        freelancerProfileId: freelancerProfile?._id,
-        coverLetter,
-        proposedRate,
-        certificationAcknowledgment,
-        attachments,
-        status
-      });
-      
-      await application.save();
-      
-      return res.status(201).json({
-        success: true,
-        message: saveAsDraft ? 'Application draft saved' : 'Application submitted successfully',
-        data: application
-      });
-    }
+    // Create new application
+    const application = new JobApplication({
+      jobId,
+      freelancerId: userId,
+      freelancerProfileId: contractorProfile._id,
+      coverLetter,
+      proposedRate: Number(proposedRate),
+      certificationAcknowledgment,
+      attachments,
+      status: 'pending'
+    });
+    
+    await application.save();
+    
+    return res.status(201).json({
+      success: true,
+      message: 'Application submitted successfully',
+      data: application
+    });
   } catch (error) {
     console.error('Error applying to job:', error);
     return res.status(500).json({
@@ -242,26 +184,108 @@ export const createOrUpdateJobApplication = async (req, res) => {
   }
 };
 
+// Save job application draft
+export const saveJobApplicationDraft = async (req, res) => {
+  try {
+    const { jobId, userId, coverLetter, proposedRate, acknowledgment } = req.body;
+    
+    // Convert acknowledgment string to boolean if needed
+    const certificationAcknowledgment = acknowledgment === 'true' || acknowledgment === true;
+    
+    // Validate job exists
+    const job = await Job.findById(jobId);
+    if (!job) {
+      return res.status(404).json({ success: false, message: 'Job not found' });
+    }
+
+    // Check if draft already exists
+    let draft = await JobApplication.findOne({ 
+      jobId, 
+      freelancerId: userId,
+      status: 'draft'
+    });
+
+    // Process file upload if it exists
+    let attachments = [];
+    if (req.file) {
+      const fileData = processUploadedFile(req.file);
+      if (fileData) {
+        attachments.push(fileData);
+      }
+    }
+
+    if (draft) {
+      // Update existing draft
+      draft.coverLetter = coverLetter || draft.coverLetter;
+      draft.proposedRate = proposedRate ? Number(proposedRate) : draft.proposedRate;
+      draft.certificationAcknowledgment = certificationAcknowledgment || draft.certificationAcknowledgment;
+      
+      // Add new attachment if exists
+      if (attachments.length > 0) {
+        draft.attachments.push(...attachments);
+      }
+      
+      await draft.save();
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Draft updated successfully',
+        data: draft
+      });
+    } else {
+      // Get freelancer profile ID
+      const contractorProfile = await mongoose.model('ContractorProfile').findOne({ user: userId });
+      
+      // Create new draft
+      draft = new JobApplication({
+        jobId,
+        freelancerId: userId,
+        freelancerProfileId: contractorProfile?._id,
+        coverLetter,
+        proposedRate: proposedRate ? Number(proposedRate) : undefined,
+        certificationAcknowledgment,
+        attachments,
+        status: 'draft'
+      });
+      
+      await draft.save();
+      
+      return res.status(201).json({
+        success: true,
+        message: 'Draft saved successfully',
+        data: draft
+      });
+    }
+  } catch (error) {
+    console.error('Error saving draft application:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'An error occurred while saving draft application',
+      error: error.message
+    });
+  }
+};
+
 // Delete draft application
-export const deleteDraftApplication = async (req, res) => {
+export const deleteJobApplicationDraft = async (req, res) => {
   try {
     const { jobId } = req.params;
-    const freelancerId = req.user.id;
+    const { userId } = req.body;
     
-    const application = await JobApplication.findOne({
+    const draft = await JobApplication.findOne({
       jobId,
-      freelancerId,
+      freelancerId: userId,
       status: 'draft'
     });
     
-    if (!application) {
+    if (!draft) {
       return res.status(404).json({
         success: false,
         message: 'Draft application not found'
       });
     }
     
-    await application.deleteOne();
+    await draft.deleteOne();
     
     return res.status(200).json({
       success: true,
@@ -277,22 +301,27 @@ export const deleteDraftApplication = async (req, res) => {
   }
 };
 
-// Set up router
+// Set up router for job application routes
 const router = express.Router();
 
-// Apply to job or save draft with file upload
+// Submit job application with file upload
 router.post(
-  '/jobs/:jobId/apply',
-  authMiddleware,
-  upload.array('attachments', 5), // Max 5 files
-  createOrUpdateJobApplication
+  '/submit',
+  upload.single('attachment'), // Single file upload
+  createJobApplication
+);
+
+// Save draft application with file upload
+router.post(
+  '/save-draft',
+  upload.single('attachment'), // Single file upload
+  saveJobApplicationDraft
 );
 
 // Delete draft application
 router.delete(
-  '/jobs/:jobId/draft',
-  authMiddleware,
-  deleteDraftApplication
+  '/delete-draft/:jobId',
+  deleteJobApplicationDraft
 );
 
 export default router;

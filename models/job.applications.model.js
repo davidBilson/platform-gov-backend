@@ -14,7 +14,7 @@ const jobApplicationSchema = new mongoose.Schema({
   },
   freelancerProfileId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'FreelancerProfile',
+    ref: 'ContractorProfile',
     required: true
   },
   
