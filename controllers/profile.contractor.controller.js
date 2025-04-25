@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import Profile from '../models/profile.freelancer.model.js';
+import ContractorProfile from '../models/profile.contractor.model.js';
 import { deleteImage, getPublicIdFromUrl } from '../utils/cloudinary.js';
 
 /**
@@ -41,7 +41,7 @@ const parseArrayField = (field) => {
  * @route GET /api/profile/:userId
  * @access Public
  */
-export const getFreelancerProfile = async (req, res) => {
+export const getContractorProfile = async (req, res) => {
   try {
     const userId = req.params.id;
     
@@ -54,18 +54,18 @@ export const getFreelancerProfile = async (req, res) => {
     }
     
     // Try string match first (in case the model expects string IDs)
-    let profile = await Profile.findOne({ user: userId });
+    let profile = await ContractorProfile.findOne({ user: userId });
     
     // If not found, try with ObjectId
     if (!profile) {
       const objectId = new mongoose.Types.ObjectId(userId.toString());
-      profile = await Profile.findOne({ user: objectId });
+      profile = await ContractorProfile.findOne({ user: objectId });
     }
     
     if (!profile) {
       return res.status(404).json({
         success: false,
-        message: 'Profile not found'
+        message: 'Contractor profile not found'
       });
     }
     
@@ -86,7 +86,7 @@ export const getFreelancerProfile = async (req, res) => {
  * @route POST /api/profile
  * @access Private
  */
-export const createFreelancerProfile = async (req, res) => {
+export const createContractorProfile = async (req, res) => {
   try {
     const userId = req.body.userId;
 
@@ -102,11 +102,11 @@ export const createFreelancerProfile = async (req, res) => {
     const objectId = new mongoose.Types.ObjectId(userId.toString());
     
     // Check if profile already exists
-    const existingProfile = await Profile.findOne({ user: objectId });
+    const existingProfile = await ContractorProfile.findOne({ user: objectId });
     if (existingProfile) {
       return res.status(400).json({
         success: false,
-        message: 'Profile already exists for this user. Use update instead.'
+        message: 'Contractor profile already exists for this user.'
       });
     }
     
@@ -135,12 +135,12 @@ export const createFreelancerProfile = async (req, res) => {
     };
     
     // Create new profile
-    const profile = await Profile.create(profileData);
+    const profile = await ContractorProfile.create(profileData);
     
     res.status(201).json({
       success: true,
       data: profile,
-      message: 'Profile created successfully'
+      message: 'Contractor profile created successfully'
     });
   } catch (error) {
     res.status(500).json({
@@ -155,7 +155,7 @@ export const createFreelancerProfile = async (req, res) => {
  * @route PUT /api/profile/:id
  * @access Private
  */
-export const updateFreelancerProfile = async (req, res) => {
+export const updateContractorProfile = async (req, res) => {
   try {
     const userId = req.params.id;
     
@@ -171,17 +171,17 @@ export const updateFreelancerProfile = async (req, res) => {
     const objectId = new mongoose.Types.ObjectId(userId.toString());
     
     // Check if profile exists
-    let profile = await Profile.findOne({ user: objectId });
+    let profile = await ContractorProfile.findOne({ user: objectId });
     
     // If not found, try with string ID as fallback
     if (!profile) {
-      profile = await Profile.findOne({ user: userId });
+      profile = await ContractorProfile.findOne({ user: userId });
     }
     
     if (!profile) {
       return res.status(404).json({
         success: false,
-        message: 'Profile not found'
+        message: 'Contractor profile not found'
       });
     }
     
@@ -231,7 +231,7 @@ export const updateFreelancerProfile = async (req, res) => {
     }
     
     // Update profile
-    profile = await Profile.findOneAndUpdate(
+    profile = await ContractorProfile.findOneAndUpdate(
       { user: objectId }, 
       { $set: updateData },
       { new: true, runValidators: true }
@@ -240,7 +240,7 @@ export const updateFreelancerProfile = async (req, res) => {
     res.status(200).json({
       success: true,
       data: profile,
-      message: 'Profile updated successfully'
+      message: 'Contractor profile updated successfully'
     });
   } catch (error) {
     res.status(500).json({
@@ -255,7 +255,7 @@ export const updateFreelancerProfile = async (req, res) => {
  * @route DELETE /api/profile/:id
  * @access Private
  */
-export const deleteFreelancerProfile = async (req, res) => {
+export const deleteContractorProfile = async (req, res) => {
   try {
     const userId = req.params.id;
     
@@ -270,11 +270,11 @@ export const deleteFreelancerProfile = async (req, res) => {
       });
     }
     
-    const profile = await Profile.findOne({ user: userObjectId });
+    const profile = await ContractorProfile.findOne({ user: userObjectId });
     if (!profile) {
       return res.status(404).json({
         success: false,
-        message: 'Profile not found'
+        message: 'Contractor profile not found'
       });
     }
     
@@ -294,11 +294,11 @@ export const deleteFreelancerProfile = async (req, res) => {
       }
     }
     
-    await Profile.findOneAndDelete({ user: userObjectId });
+    await ContractorProfile.findOneAndDelete({ user: userObjectId });
     
     res.status(200).json({
       success: true,
-      message: 'Profile deleted successfully'
+      message: 'Contractor profile deleted successfully'
     });
   } catch (error) {
     res.status(500).json({
@@ -310,7 +310,7 @@ export const deleteFreelancerProfile = async (req, res) => {
 
 /**
  * Get current user's profile (included for compatibility with frontend)
- * Note: This is essentially the same as getFreelancerProfile but uses query parameter
+ * Note: This is essentially the same as getContractorProfile but uses query parameter
  * @route GET /api/profile/me
  * @access Public
  */
@@ -329,12 +329,12 @@ export const getMyProfile = async (req, res) => {
       });
     }
     
-    const profile = await Profile.findOne({ user: userObjectId });
+    const profile = await ContractorProfile.findOne({ user: userObjectId });
     
     if (!profile) {
       return res.status(404).json({
         success: false,
-        message: 'Profile not found'
+        message: 'Contractor profile not found'
       });
     }
     
@@ -384,13 +384,13 @@ export const searchProfiles = async (req, res) => {
     }
     
     // Find profiles matching criteria
-    const profiles = await Profile.find(searchCriteria)
+    const profiles = await ContractorProfile.find(searchCriteria)
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
       .skip(parseInt(skip));
     
     // Count total matching profiles for pagination
-    const total = await Profile.countDocuments(searchCriteria);
+    const total = await ContractorProfile.countDocuments(searchCriteria);
     
     res.status(200).json({
       success: true,
@@ -414,7 +414,7 @@ export const searchProfiles = async (req, res) => {
  */
 export const getAllSkills = async (req, res) => {
   try {
-    const skills = await Profile.distinct('skills');
+    const skills = await ContractorProfile.distinct('skills');
     
     res.status(200).json({
       success: true,
@@ -437,7 +437,7 @@ export const getAllSkills = async (req, res) => {
  */
 export const getAllExpertise = async (req, res) => {
   try {
-    const expertise = await Profile.distinct('expertise');
+    const expertise = await ContractorProfile.distinct('expertise');
     
     res.status(200).json({
       success: true,

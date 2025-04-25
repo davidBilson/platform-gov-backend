@@ -174,7 +174,6 @@ const jobSchema = new mongoose.Schema({
   }
 });
 
-// Pre-save middleware to update the updatedAt field
 jobSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   next();

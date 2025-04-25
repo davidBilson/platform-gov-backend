@@ -60,7 +60,7 @@ const DegreeSchema = new Schema({
 });
 
 // Profile schema
-const profileSchema = new Schema({
+const contractorProfileSchema = new Schema({
   user: {
     type: Schema.Types.ObjectId,
     ref: 'User',
@@ -100,14 +100,14 @@ const profileSchema = new Schema({
 });
 
 // Index for faster queries
-profileSchema.index({ user: 1 }, { unique: true });
-profileSchema.index({ skills: 1 });
-profileSchema.index({ expertise: 1 });
-profileSchema.index({ certifications: 1 });
+contractorProfileSchema.index({ user: 1 }, { unique: true });
+contractorProfileSchema.index({ skills: 1 });
+contractorProfileSchema.index({ expertise: 1 });
+contractorProfileSchema.index({ certifications: 1 });
 
 
 // Document middleware: runs before .save() and .create()
-profileSchema.pre('save', function(next) {
+contractorProfileSchema.pre('save', function(next) {
   // Convert rate per hour to number if it's a string
   if (typeof this.ratePerHour === 'string') {
     this.ratePerHour = parseFloat(this.ratePerHour) || 0;
@@ -116,5 +116,5 @@ profileSchema.pre('save', function(next) {
   next();
 });
 
-const Profile = mongoose.model('Profile', profileSchema);
-export default Profile;
+const ContractorProfile = mongoose.model('ContractorProfile', contractorProfileSchema);
+export default ContractorProfile;

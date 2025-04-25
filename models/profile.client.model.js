@@ -27,7 +27,7 @@ const locationSchema = new mongoose.Schema({
   }
 });
 
-const businessProfileSchema = new mongoose.Schema({
+const clientProfileSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -71,6 +71,6 @@ const businessProfileSchema = new mongoose.Schema({
   }
 });
 
-const BusinessProfile = mongoose.model('BusinessProfile', businessProfileSchema);
+const ClientProfile = mongoose.model('clientProfile', clientProfileSchema);
 
-export default BusinessProfile;
+export default ClientProfile;

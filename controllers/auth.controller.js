@@ -116,7 +116,6 @@ export const verifyEmail = async (req, res, next) => {
 
 export const sendPhoneVerificationCode = async (req, res, next) => {
   try {
-    console.log("Sending phone verification code...");
     const { userId } = req.body;
     
     const user = await User.findById(userId);
@@ -150,7 +149,6 @@ export const sendPhoneVerificationCode = async (req, res, next) => {
       status: 'success',
       message: 'Verification code sent to your phone number'
     });
-    console.log("Phone verification code sent successfully");
   } catch (error) {
     next(error);
   }
@@ -436,7 +434,6 @@ export const verifyResetToken = async (req, res, next) => {
       });
     }
     
-    console.log('Verifying token:', { email, resetToken }); // Debugging log
     
     const user = await User.findOne({
       email,
@@ -445,14 +442,11 @@ export const verifyResetToken = async (req, res, next) => {
     });
     
     if (!user) {
-      console.log('User not found or token expired'); // Debugging log
       return res.status(400).json({ 
         success: false,
         message: 'Invalid or expired reset token' 
       });
     }
-    
-    console.log('Token verified successfully'); // Debugging log
     
     res.status(200).json({
       success: true,

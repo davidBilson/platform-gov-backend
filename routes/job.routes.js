@@ -9,7 +9,7 @@ import {
   changeJobStatus,
   addOrUpdateMilestone,
   removeMilestone
-} from '../controllers/job.created.controller.js';
+} from '../controllers/job.create.controller.js';
 
 const router = express.Router();
 

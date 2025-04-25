@@ -1,47 +1,38 @@
 // profile.routes.js
 import express from 'express';
-import {
-    createFreelancerProfile,
-    updateFreelancerProfile,
-    getFreelancerProfile,
-    deleteFreelancerProfile
-} from '../controllers/profile.freelancer.controller.js';
 
 import {
-    createBusinessProfile,
-    updateBusinessProfile,
-    getBusinessProfile,
-    deleteBusinessProfile
-} from '../controllers/profile.business.controller.js';
+    createContractorProfile,
+    updateContractorProfile,
+    getContractorProfile,
+    deleteContractorProfile
+} from '../controllers/profile.contractor.controller.js';
+
+import {
+    createClientProfile,
+    updateClientProfile,
+    getClientProfile,
+    deleteClientProfile
+} from '../controllers/profile.client.controller.js';
 
 import { upload } from '../middleware/multer-image-upload.js';
-
 import { uploadImage } from '../utils/cloudinary.js';
 
 const router = express.Router();
 
-// Routes
+// CLIENT ROUTES
+router.post('/create-client-profile', createClientProfile);
+router.get('/fetch-client-profile/:id', getClientProfile);
+router.put('/update-client-profile/:id', updateClientProfile);
+router.delete('/delete-client-profile/:id', deleteClientProfile);
 
-router.post('/create-business-profile', createBusinessProfile);
+// CONTRACTOR ROUTES
+router.post('/create-contractor-profile', createContractorProfile);
+router.get('/fetch-contractor-profile/:id', getContractorProfile);
+router.put('/update-contractor-profile/:id', updateContractorProfile);
+router.delete('/delete-contractor-profile/:id', deleteContractorProfile);
 
-router.get('/fetch-business-profile/:id', getBusinessProfile);
-
-router.put('/update-business-profile/:id', updateBusinessProfile);
-
-router.delete('/delete-business-profile/:id', deleteBusinessProfile);
-
-
-router.post('/create-freelancer-profile', createFreelancerProfile);
-
-router.get('/fetch-freelancer-profile/:id', getFreelancerProfile);
-
-router.put('/update-freelancer-profile/:id', updateFreelancerProfile);
-
-router.delete('/delete-freelancer-profile/:id', deleteFreelancerProfile);
-
-// Image upload route
-
-
+// IMAGE UPLOAD ROUTE
 router.post('/upload-profile-image', upload.single('profileImage'), async (req, res) => {
   try {
     if (!req.file) {

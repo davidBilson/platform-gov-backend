@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import Job from '../models/job.created.model.js';
-import BusinessProfile from '../models/profile.business.model.js';
+import BusinessProfile from '../models/profile.client.model.js';
 
 /**
  * Validate ObjectId

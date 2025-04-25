@@ -1,6 +1,6 @@
 
 import mongoose from 'mongoose';
-import BusinessProfile from '../models/profile.business.model.js';
+import ClientProfile from '../models/profile.client.model.js';
 import { deleteImage, getPublicIdFromUrl } from '../utils/cloudinary.js';
 
 /**
@@ -38,11 +38,11 @@ const parseArrayField = (field) => {
 };
 
 /**
- * Get business profile by user ID
- * @route GET /api/profile/fetch-business-profile/:id
+ * Get client profile by user ID
+ * @route GET /api/profile/fetch-client-profile/:id
  * @access Public
  */
-export const getBusinessProfile = async (req, res) => {
+export const getClientProfile = async (req, res) => {
   try {
     const userId = req.params.id;
     
@@ -55,18 +55,18 @@ export const getBusinessProfile = async (req, res) => {
     }
     
     // Try string match first (in case the model expects string IDs)
-    let profile = await BusinessProfile.findOne({ user: userId });
+    let profile = await ClientProfile.findOne({ user: userId });
     
     // If not found, try with ObjectId
     if (!profile) {
       const objectId = new mongoose.Types.ObjectId(userId.toString());
-      profile = await BusinessProfile.findOne({ user: objectId });
+      profile = await ClientProfile.findOne({ user: objectId });
     }
     
     if (!profile) {
       return res.status(404).json({
         success: false,
-        message: 'Business profile not found'
+        message: 'Client profile not found'
       });
     }
     
@@ -83,11 +83,11 @@ export const getBusinessProfile = async (req, res) => {
 };
 
 /**
- * Create a new business profile
- * @route POST /api/profile/create-business-profile
+ * Create a new client profile
+ * @route POST /api/profile/create-client-profile
  * @access Private
  */
-export const createBusinessProfile = async (req, res) => {
+export const createClientProfile = async (req, res) => {
   try {
     const userId = req.body.userId;
 
@@ -103,11 +103,11 @@ export const createBusinessProfile = async (req, res) => {
     const objectId = new mongoose.Types.ObjectId(userId.toString());
     
     // Check if profile already exists
-    const existingProfile = await BusinessProfile.findOne({ user: objectId });
+    const existingProfile = await ClientProfile.findOne({ user: objectId });
     if (existingProfile) {
       return res.status(400).json({
         success: false,
-        message: 'Business profile already exists for this user. Use update instead.'
+        message: 'Client profile already exists for this user. Use update instead.'
       });
     }
     
@@ -143,12 +143,12 @@ export const createBusinessProfile = async (req, res) => {
     };
     
     // Create new profile
-    const profile = await BusinessProfile.create(profileData);
+    const profile = await ClientProfile.create(profileData);
     
     res.status(201).json({
       success: true,
       data: profile,
-      message: 'Business profile created successfully'
+      message: 'Client profile created successfully'
     });
   } catch (error) {
     res.status(500).json({
@@ -159,11 +159,11 @@ export const createBusinessProfile = async (req, res) => {
 };
 
 /**
- * Update a business profile
- * @route PUT /api/profile/update-business-profile/:id
+ * Update a Client profile
+ * @route PUT /api/profile/update-Client-profile/:id
  * @access Private
  */
-export const updateBusinessProfile = async (req, res) => {
+export const updateClientProfile = async (req, res) => {
   try {
     const userId = req.params.id;
     
@@ -179,17 +179,17 @@ export const updateBusinessProfile = async (req, res) => {
     const objectId = new mongoose.Types.ObjectId(userId.toString());
     
     // Check if profile exists
-    let profile = await BusinessProfile.findOne({ user: objectId });
+    let profile = await ClientProfile.findOne({ user: objectId });
     
     // If not found, try with string ID as fallback
     if (!profile) {
-      profile = await BusinessProfile.findOne({ user: userId });
+      profile = await ClientProfile.findOne({ user: userId });
     }
     
     if (!profile) {
       return res.status(404).json({
         success: false,
-        message: 'Business profile not found'
+        message: 'Client profile not found'
       });
     }
     
@@ -263,7 +263,7 @@ export const updateBusinessProfile = async (req, res) => {
     }
     
     // Update profile
-    profile = await BusinessProfile.findOneAndUpdate(
+    profile = await ClientProfile.findOneAndUpdate(
       { user: objectId }, 
       { $set: updateData },
       { new: true, runValidators: true }
@@ -272,7 +272,7 @@ export const updateBusinessProfile = async (req, res) => {
     res.status(200).json({
       success: true,
       data: profile,
-      message: 'Business profile updated successfully'
+      message: 'Client profile updated successfully'
     });
   } catch (error) {
     res.status(500).json({
@@ -283,11 +283,11 @@ export const updateBusinessProfile = async (req, res) => {
 };
 
 /**
- * Delete a business profile
- * @route DELETE /api/profile/delete-business-profile/:id
+ * Delete a client profile
+ * @route DELETE /api/profile/delete-client-profile/:id
  * @access Private
  */
-export const deleteBusinessProfile = async (req, res) => {
+export const deleteClientProfile = async (req, res) => {
   try {
     const userId = req.params.id;
     
@@ -302,11 +302,11 @@ export const deleteBusinessProfile = async (req, res) => {
       });
     }
     
-    const profile = await BusinessProfile.findOne({ user: userObjectId });
+    const profile = await ClientProfile.findOne({ user: userObjectId });
     if (!profile) {
       return res.status(404).json({
         success: false,
-        message: 'Business profile not found'
+        message: 'Client profile not found'
       });
     }
     
@@ -326,11 +326,11 @@ export const deleteBusinessProfile = async (req, res) => {
       }
     }
     
-    await BusinessProfile.findOneAndDelete({ user: userObjectId });
+    await ClientProfile.findOneAndDelete({ user: userObjectId });
     
     res.status(200).json({
       success: true,
-      message: 'Business profile deleted successfully'
+      message: 'Client profile deleted successfully'
     });
   } catch (error) {
     res.status(500).json({
@@ -341,11 +341,11 @@ export const deleteBusinessProfile = async (req, res) => {
 };
 
 /**
- * Add a new location to business profile
- * @route POST /api/profile/business-location/:id
+ * Add a new location to client profile
+ * @route POST /api/profile/client-location/:id
  * @access Private
  */
-export const addBusinessLocation = async (req, res) => {
+export const addClientLocation = async (req, res) => {
   try {
     const userId = req.params.id;
     
@@ -361,12 +361,12 @@ export const addBusinessLocation = async (req, res) => {
     const objectId = new mongoose.Types.ObjectId(userId.toString());
     
     // Check if profile exists
-    let profile = await BusinessProfile.findOne({ user: objectId });
+    let profile = await ClientProfile.findOne({ user: objectId });
     
     if (!profile) {
       return res.status(404).json({
         success: false,
-        message: 'Business profile not found'
+        message: 'Client profile not found'
       });
     }
     
@@ -381,7 +381,7 @@ export const addBusinessLocation = async (req, res) => {
     };
     
     // Add location to profile
-    profile = await BusinessProfile.findOneAndUpdate(
+    profile = await ClientProfile.findOneAndUpdate(
       { user: objectId },
       { $push: { locations: newLocation } },
       { new: true }
@@ -401,11 +401,11 @@ export const addBusinessLocation = async (req, res) => {
 };
 
 /**
- * Remove a location from business profile
- * @route DELETE /api/profile/business-location/:id/:locationIndex
+ * Remove a location from client profile
+ * @route DELETE /api/profile/client-location/:id/:locationIndex
  * @access Private
  */
-export const removeBusinessLocation = async (req, res) => {
+export const removeClientLocation = async (req, res) => {
   try {
     const userId = req.params.id;
     const locationIndex = parseInt(req.params.locationIndex);
@@ -430,12 +430,12 @@ export const removeBusinessLocation = async (req, res) => {
     const objectId = new mongoose.Types.ObjectId(userId.toString());
     
     // Check if profile exists
-    let profile = await BusinessProfile.findOne({ user: objectId });
+    let profile = await ClientProfile.findOne({ user: objectId });
     
     if (!profile) {
       return res.status(404).json({
         success: false,
-        message: 'Business profile not found'
+        message: 'Client profile not found'
       });
     }
     
@@ -451,7 +451,7 @@ export const removeBusinessLocation = async (req, res) => {
     profile.locations.splice(locationIndex, 1);
     
     // Update profile
-    profile = await BusinessProfile.findOneAndUpdate(
+    profile = await ClientProfile.findOneAndUpdate(
       { user: objectId },
       { $set: { locations: profile.locations } },
       { new: true }
