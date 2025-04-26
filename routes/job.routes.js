@@ -15,7 +15,10 @@ import {
   saveJobApplicationDraft,
   deleteJobApplicationDraft
 } from '../controllers/job.apply.controller.js';
+
 import multer from 'multer';
+import path from 'path'; // Add this import
+import fs from 'fs';     // Add this impor
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
