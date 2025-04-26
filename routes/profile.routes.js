@@ -5,14 +5,16 @@ import {
     createContractorProfile,
     updateContractorProfile,
     getContractorProfile,
-    deleteContractorProfile
+    deleteContractorProfile,
+    getAllContractorProfiles
 } from '../controllers/profile.contractor.controller.js';
 
 import {
     createClientProfile,
     updateClientProfile,
     getClientProfile,
-    deleteClientProfile
+    deleteClientProfile,
+    getAllClientProfiles
 } from '../controllers/profile.client.controller.js';
 
 import { upload } from '../middleware/multer-image-upload.js';
@@ -22,12 +24,14 @@ const router = express.Router();
 
 // CLIENT ROUTES
 router.post('/create-client-profile', createClientProfile);
+router.get('/fetch-all-clients', getAllClientProfiles);
 router.get('/fetch-client-profile/:id', getClientProfile);
 router.put('/update-client-profile/:id', updateClientProfile);
 router.delete('/delete-client-profile/:id', deleteClientProfile);
 
 // CONTRACTOR ROUTES
 router.post('/create-contractor-profile', createContractorProfile);
+router.get('/fetch-all-contractors', getAllContractorProfiles);
 router.get('/fetch-contractor-profile/:id', getContractorProfile);
 router.put('/update-contractor-profile/:id', updateContractorProfile);
 router.delete('/delete-contractor-profile/:id', deleteContractorProfile);

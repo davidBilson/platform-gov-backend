@@ -37,6 +37,31 @@ const parseArrayField = (field) => {
   }
 };
 
+
+// Add to profile.client.controller.js
+/**
+ * Get all client profiles
+ * @route GET /api/profile/clients
+ * @access Public
+ */
+export const getAllClientProfiles = async (req, res) => {
+  try {
+    const profiles = await ClientProfile.find();
+    
+    res.status(200).json({
+      success: true,
+      count: profiles.length,
+      data: profiles
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Internal server error'
+    });
+  }
+};
+
+
 /**
  * Get client profile by user ID
  * @route GET /api/profile/fetch-client-profile/:id

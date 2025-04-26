@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import ContractorProfile from '../models/profile.contractor.model.js';
+import User from '../models/user.model.js';
 import { deleteImage, getPublicIdFromUrl } from '../utils/cloudinary.js';
 
 /**
@@ -35,6 +36,60 @@ const parseArrayField = (field) => {
     return [field]; // Return as single item array if not JSON parseable
   }
 };
+
+
+// Add to profile.contractor.controller.js
+/**
+ * Get all contractor profiles
+ * @route GET /api/profile/contractors
+ * @access Public
+ */
+export const getAllContractorProfiles = async (req, res) => {
+  try {
+    // Get all contractor profiles
+    const profiles = await ContractorProfile.find();
+    
+    // Create an array to store the enhanced profiles
+    const enhancedProfiles = [];
+    
+    // Fetch additional user information for each profile
+    for (const profile of profiles) {
+      // Get user details using the user ID from the profile
+      const user = await User.findById(profile.user).select('name email phoneNumber');
+      
+      if (user) {
+        // Combine profile data with user data
+        const enhancedProfile = {
+          ...profile.toObject(),
+          user: {
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            phoneNumber: user.phoneNumber
+          }
+        };
+        
+        enhancedProfiles.push(enhancedProfile);
+      } else {
+        // If user not found, just include the profile
+        enhancedProfiles.push(profile.toObject());
+      }
+    }
+    
+    res.status(200).json({
+      success: true,
+      count: enhancedProfiles.length,
+      data: enhancedProfiles
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Internal server error'
+    });
+  }
+};
+
+
 
 /**
  * Get profile by user ID
