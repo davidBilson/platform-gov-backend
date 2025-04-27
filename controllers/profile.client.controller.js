@@ -38,7 +38,6 @@ const parseArrayField = (field) => {
 };
 
 
-// Add to profile.client.controller.js
 /**
  * Get all client profiles
  * @route GET /api/profile/clients

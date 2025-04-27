@@ -60,7 +60,6 @@ const storage = multer.diskStorage({
   }
 });
 
-// File filter to restrict file types
 const fileFilter = (req, file, cb) => {
   // Accept common document types
   const allowedFileTypes = [
@@ -243,7 +242,6 @@ export const saveJobApplicationDraft = async (req, res) => {
         data: draft
       });
     } else {
-      // Get freelancer profile ID
       const contractorProfile = await mongoose.model('ContractorProfile').findOne({ user: userId });
       
       // Create new draft
@@ -276,7 +274,6 @@ export const saveJobApplicationDraft = async (req, res) => {
   }
 };
 
-// Delete draft application
 export const deleteJobApplicationDraft = async (req, res) => {
   try {
     const { jobId } = req.params;
@@ -311,13 +308,10 @@ export const deleteJobApplicationDraft = async (req, res) => {
   }
 };
 
-
-// Get applications by jobId (for clients to view applicants)
 export const getApplicationsByJobId = async (req, res) => {
   try {
     const { jobId } = req.params;
     
-    // Validate jobId is a valid ObjectId
     if (!mongoose.Types.ObjectId.isValid(jobId)) {
       return res.status(400).json({ 
         success: false, 
@@ -325,7 +319,6 @@ export const getApplicationsByJobId = async (req, res) => {
       });
     }
     
-    // Get job to verify it exists and check ownership
     const job = await Job.findById(jobId);
     if (!job) {
       return res.status(404).json({ 
@@ -334,7 +327,6 @@ export const getApplicationsByJobId = async (req, res) => {
       });
     }
     
-    // Check if the user is the job owner (client)
     if (job.clientId.toString() !== req.user.id.toString()) {
       return res.status(403).json({ 
         success: false, 
@@ -342,7 +334,6 @@ export const getApplicationsByJobId = async (req, res) => {
       });
     }
     
-    // Find all applications for this job, excluding drafts
     const applications = await JobApplication.find({ 
       jobId, 
       status: { $ne: 'draft' } 
@@ -365,12 +356,10 @@ export const getApplicationsByJobId = async (req, res) => {
   }
 };
 
-// Get applications by freelancerId (for freelancers to view their applications)
 export const getApplicationsByFreelancerId = async (req, res) => {
   try {
     const userId = req.params.id;
     
-    // Validate user ID
     if (!userId || !isValidObjectId(userId)) {
       return res.status(400).json({
         success: false,
@@ -378,7 +367,6 @@ export const getApplicationsByFreelancerId = async (req, res) => {
       });
     }
     
-    // Find all applications for this freelancer, including drafts
     const applications = await JobApplication.find({ 
       freelancerId: userId 
     })
@@ -401,17 +389,14 @@ export const getApplicationsByFreelancerId = async (req, res) => {
 };
 
 
-// Set up router for job application routes
 const router = express.Router();
 
-// Submit job application with file upload
 router.post(
   '/submit',
-  upload.single('attachment'), // Single file upload
+  upload.single('attachment'),
   createJobApplication
 );
 
-// Update the router at the bottom of the file to include the new routes
 router.get(
   '/applications/job/:id',
   getApplicationsByJobId
@@ -422,19 +407,15 @@ router.get(
   getApplicationsByFreelancerId
 );
 
-// Save draft application with file upload
 router.post(
   '/save-draft',
-  upload.single('attachment'), // Single file upload
+  upload.single('attachment'),
   saveJobApplicationDraft
 );
 
-// Delete draft application
 router.delete(
   '/delete-draft/:id',
   deleteJobApplicationDraft
 );
-// hey claude
-//  add get job applications here
 
 export default router;

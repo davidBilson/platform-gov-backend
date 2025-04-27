@@ -37,8 +37,6 @@ const parseArrayField = (field) => {
   }
 };
 
-
-// Add to profile.contractor.controller.js
 /**
  * Get all contractor profiles
  * @route GET /api/profile/contractors

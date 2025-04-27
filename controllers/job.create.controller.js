@@ -721,6 +721,7 @@ export const addOrUpdateMilestone = async (req, res) => {
  * @route DELETE /api/jobs/:id/milestones/:milestoneId
  * @access Private (own jobs only)
  */
+
 export const removeMilestone = async (req, res) => {
   try {
     const jobId = req.params.id;
