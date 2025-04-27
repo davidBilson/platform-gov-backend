@@ -105,6 +105,16 @@ const processUploadedFile = (file) => {
   };
 };
 
+
+const isValidObjectId = (id) => {
+  return mongoose.Types.ObjectId.isValid(id);
+};
+
+const toObjectId = (id) => {
+  if (!id || !isValidObjectId(id)) return null;
+  return new mongoose.Types.ObjectId(id.toString());
+};
+
 // Submit job application
 export const createJobApplication = async (req, res) => {
   try {
@@ -301,6 +311,96 @@ export const deleteJobApplicationDraft = async (req, res) => {
   }
 };
 
+
+// Get applications by jobId (for clients to view applicants)
+export const getApplicationsByJobId = async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    
+    // Validate jobId is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(jobId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid job ID format' 
+      });
+    }
+    
+    // Get job to verify it exists and check ownership
+    const job = await Job.findById(jobId);
+    if (!job) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Job not found' 
+      });
+    }
+    
+    // Check if the user is the job owner (client)
+    if (job.clientId.toString() !== req.user.id.toString()) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'You are not authorized to view these applications' 
+      });
+    }
+    
+    // Find all applications for this job, excluding drafts
+    const applications = await JobApplication.find({ 
+      jobId, 
+      status: { $ne: 'draft' } 
+    })
+    .populate('freelancerProfileId', 'name profilePicture hourlyRate skills rating location')
+    .sort({ createdAt: -1 });
+    
+    return res.status(200).json({
+      success: true,
+      count: applications.length,
+      data: applications
+    });
+  } catch (error) {
+    console.error('Error fetching job applications:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'An error occurred while fetching job applications',
+      error: error.message
+    });
+  }
+};
+
+// Get applications by freelancerId (for freelancers to view their applications)
+export const getApplicationsByFreelancerId = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    
+    // Validate user ID
+    if (!userId || !isValidObjectId(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID'
+      });
+    }
+    
+    // Find all applications for this freelancer, including drafts
+    const applications = await JobApplication.find({ 
+      freelancerId: userId 
+    })
+    .populate('jobId', 'jobTitle description userId clientName clientLogo jobCategory employmentType paymentType retainerAmount retainerFrequency retainerDuration location price status createdAt')
+    .sort({ createdAt: -1 });
+    
+    return res.status(200).json({
+      success: true,
+      count: applications.length,
+      data: applications
+    });
+  } catch (error) {
+    console.error('Error fetching user applications:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'An error occurred while fetching user applications',
+      error: error.message
+    });
+  }
+};
+
+
 // Set up router for job application routes
 const router = express.Router();
 
@@ -309,6 +409,17 @@ router.post(
   '/submit',
   upload.single('attachment'), // Single file upload
   createJobApplication
+);
+
+// Update the router at the bottom of the file to include the new routes
+router.get(
+  '/applications/job/:id',
+  getApplicationsByJobId
+);
+
+router.get(
+  '/applications/user/:id',
+  getApplicationsByFreelancerId
 );
 
 // Save draft application with file upload
@@ -320,8 +431,10 @@ router.post(
 
 // Delete draft application
 router.delete(
-  '/delete-draft/:jobId',
+  '/delete-draft/:id',
   deleteJobApplicationDraft
 );
+// hey claude
+//  add get job applications here
 
 export default router;
