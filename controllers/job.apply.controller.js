@@ -276,7 +276,7 @@ export const saveJobApplicationDraft = async (req, res) => {
 
 export const deleteJobApplicationDraft = async (req, res) => {
   try {
-    const { jobId } = req.params;
+    const jobId = req.params.id;
     const { userId } = req.body;
     
     const draft = await JobApplication.findOne({
