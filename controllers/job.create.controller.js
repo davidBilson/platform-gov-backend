@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import Job from '../models/job.created.model.js';
 import BusinessProfile from '../models/profile.client.model.js';
+import JobApplication from '../models/job.applications.model.js';
 
 /**
  * Validate ObjectId
@@ -190,7 +191,7 @@ export const getJobsByUserId = async (req, res) => {
     const userId = req.params.id;
     
     // Validate user ID
-    if (!userId || !isValidObjectId(userId)) {
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid user ID'
@@ -219,9 +220,31 @@ export const getJobsByUserId = async (req, res) => {
     // Get total count for pagination
     const total = await Job.countDocuments(filter);
     
+    // Get proposal counts for each job
+    const jobIds = jobs.map(job => job._id);
+    
+    // Count proposals for each job
+    const proposalCounts = await JobApplication.aggregate([
+      { $match: { jobId: { $in: jobIds } } },
+      { $group: { _id: "$jobId", count: { $sum: 1 } } }
+    ]);
+    
+    // Create a map of job ID to proposal count
+    const proposalCountMap = {};
+    proposalCounts.forEach(item => {
+      proposalCountMap[item._id.toString()] = item.count;
+    });
+    
+    // Add proposal count to each job
+    const jobsWithProposalCounts = jobs.map(job => {
+      const jobObj = job.toObject();
+      jobObj.proposalsCount = proposalCountMap[job._id.toString()] || 0;
+      return jobObj;
+    });
+    
     res.status(200).json({
       success: true,
-      data: jobs,
+      data: jobsWithProposalCounts,
       pagination: {
         total,
         page,
@@ -236,7 +259,6 @@ export const getJobsByUserId = async (req, res) => {
     });
   }
 };
-
 /**
  * Create a new job
  * @route POST /api/jobs

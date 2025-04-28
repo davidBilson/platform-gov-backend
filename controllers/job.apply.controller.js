@@ -1,4 +1,4 @@
-// jobApplication.controller.js
+// Fixed jobApplication.controller.js
 import JobApplication from '../models/job.applications.model.js';
 import Job from '../models/job.created.model.js';
 import mongoose from 'mongoose';
@@ -104,7 +104,6 @@ const processUploadedFile = (file) => {
   };
 };
 
-
 const isValidObjectId = (id) => {
   return mongoose.Types.ObjectId.isValid(id);
 };
@@ -133,16 +132,17 @@ export const createJobApplication = async (req, res) => {
       return res.status(400).json({ success: false, message: 'This job is no longer accepting applications' });
     }
 
-    // Check if user already applied to this job
-    const existingApplication = await JobApplication.findOne({ 
+    // Check if user already has a submitted application (not a draft) for this job
+    const existingSubmittedApplication = await JobApplication.findOne({ 
       jobId, 
-      freelancerId: userId
+      freelancerId: userId,
+      status: { $ne: 'draft' }
     });
 
-    if (existingApplication) {
+    if (existingSubmittedApplication) {
       return res.status(400).json({ 
         success: false, 
-        message: 'You have already applied to this job' 
+        message: 'You have already submitted an application to this job' 
       });
     }
 
@@ -164,25 +164,55 @@ export const createJobApplication = async (req, res) => {
       }
     }
 
-    // Create new application
-    const application = new JobApplication({
+    // Check if draft exists and update it instead of creating new application
+    const existingDraft = await JobApplication.findOne({
       jobId,
       freelancerId: userId,
-      freelancerProfileId: contractorProfile._id,
-      coverLetter,
-      proposedRate: Number(proposedRate),
-      certificationAcknowledgment,
-      attachments,
-      status: 'pending'
+      status: 'draft'
     });
-    
-    await application.save();
-    
-    return res.status(201).json({
-      success: true,
-      message: 'Application submitted successfully',
-      data: application
-    });
+
+    if (existingDraft) {
+      // Update the draft and change status to pending
+      existingDraft.coverLetter = coverLetter;
+      existingDraft.proposedRate = Number(proposedRate);
+      existingDraft.certificationAcknowledgment = certificationAcknowledgment;
+      
+      // Add new attachment if exists
+      if (attachments.length > 0) {
+        existingDraft.attachments.push(...attachments);
+      }
+      
+      // Change status from draft to pending
+      existingDraft.status = 'pending';
+      
+      await existingDraft.save();
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Application submitted successfully from draft',
+        data: existingDraft
+      });
+    } else {
+      // Create new application
+      const application = new JobApplication({
+        jobId,
+        freelancerId: userId,
+        freelancerProfileId: contractorProfile._id,
+        coverLetter,
+        proposedRate: Number(proposedRate),
+        certificationAcknowledgment,
+        attachments,
+        status: 'pending'
+      });
+      
+      await application.save();
+      
+      return res.status(201).json({
+        success: true,
+        message: 'Application submitted successfully',
+        data: application
+      });
+    }
   } catch (error) {
     console.error('Error applying to job:', error);
     return res.status(500).json({
@@ -205,6 +235,20 @@ export const saveJobApplicationDraft = async (req, res) => {
     const job = await Job.findById(jobId);
     if (!job) {
       return res.status(404).json({ success: false, message: 'Job not found' });
+    }
+
+    // Check if user already has a submitted application for this job
+    const existingSubmittedApplication = await JobApplication.findOne({ 
+      jobId, 
+      freelancerId: userId,
+      status: { $ne: 'draft' }
+    });
+
+    if (existingSubmittedApplication) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'You have already submitted an application to this job' 
+      });
     }
 
     // Check if draft already exists
@@ -298,11 +342,63 @@ export const deleteJobApplicationDraft = async (req, res) => {
       success: true,
       message: 'Draft application deleted successfully'
     });
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Error deleting draft application:', error);
     return res.status(500).json({
       success: false,
       message: 'An error occurred while deleting the draft application',
+      error: error.message
+    });
+  }
+};
+
+// Update job application attachments
+export const updateJobApplicationAttachments = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId, action, filename } = req.body;
+    
+    const application = await JobApplication.findById(id);
+    
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: 'Application not found'
+      });
+    }
+    
+    if (application.freelancerId.toString() !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to update this application'
+      });
+    }
+    
+    if (action === 'remove' && filename) {
+      // Remove file from attachments
+      application.attachments = application.attachments.filter(
+        attachment => attachment.filename !== filename
+      );
+      
+      await application.save();
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Attachment removed successfully',
+        data: application
+      });
+    }
+    
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid action specified'
+    });
+  } catch (error) {
+    console.error('Error updating application attachments:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'An error occurred while updating application attachments',
       error: error.message
     });
   }
@@ -388,7 +484,6 @@ export const getApplicationsByFreelancerId = async (req, res) => {
   }
 };
 
-
 const router = express.Router();
 
 router.post(
@@ -416,6 +511,11 @@ router.post(
 router.delete(
   '/delete-draft/:id',
   deleteJobApplicationDraft
+);
+
+router.patch(
+  '/update-draft-attachments/:id',
+  updateJobApplicationAttachments
 );
 
 export default router;
