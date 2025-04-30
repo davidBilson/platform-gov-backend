@@ -122,7 +122,7 @@ const jobSchema = new mongoose.Schema({
   },
   employmentType: {
     type: String,
-    enum: ['full-time', 'part-time'],
+    enum: ['Full Time', 'part-time'],
     required: true
   },
   paymentType: {
