@@ -61,6 +61,7 @@ const DegreeSchema = new Schema({
 
 // Profile schema
 const contractorProfileSchema = new Schema({
+ 
   user: {
     type: Schema.Types.ObjectId,
     ref: 'User',
@@ -81,6 +82,23 @@ const contractorProfileSchema = new Schema({
   primaryPosition: {
     type: String,
     trim: true
+  },
+  firmAffiliation: {
+    type: String,
+    trim: true,
+    default: ""
+  },
+  location: {
+    country: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    state: {
+      type: String,
+      trim: true,
+      default: ""
+    }
   },
   skills: [String],
   expertise: [String],
