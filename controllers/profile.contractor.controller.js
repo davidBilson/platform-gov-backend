@@ -143,7 +143,6 @@ export const createContractorProfile = async (req, res) => {
   try {
     const userId = req.body.userId;
 
-    // Validate userId
     if (!userId || !isValidObjectId(userId)) {
       return res.status(400).json({
         success: false,
@@ -213,8 +212,6 @@ export const createContractorProfile = async (req, res) => {
 export const updateContractorProfile = async (req, res) => {
   try {
     const userId = req.params.id;
-    
-    // Validate userId
     if (!userId || !isValidObjectId(userId)) {
       return res.status(400).json({
         success: false,
