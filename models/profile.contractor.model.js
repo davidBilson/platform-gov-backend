@@ -114,8 +114,9 @@ const contractorProfileSchema = new Schema({
     default: Date.now
   }
 }, {
-  timestamps: true
+  timestamps: true,
 });
+
 
 // Index for faster queries
 contractorProfileSchema.index({ user: 1 }, { unique: true });

@@ -403,10 +403,9 @@ export const updateJobApplicationAttachments = async (req, res) => {
     });
   }
 };
-
 export const getApplicationsByJobId = async (req, res) => {
   try {
-    const { jobId } = req.params;
+    const jobId = req.params.id;
     
     if (!mongoose.Types.ObjectId.isValid(jobId)) {
       return res.status(400).json({ 
@@ -423,24 +422,36 @@ export const getApplicationsByJobId = async (req, res) => {
       });
     }
     
-    if (job.clientId.toString() !== req.user.id.toString()) {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'You are not authorized to view these applications' 
-      });
-    }
-    
     const applications = await JobApplication.find({ 
       jobId, 
       status: { $ne: 'draft' } 
     })
-    .populate('freelancerProfileId', 'name profilePicture hourlyRate skills rating location')
+    .populate({
+      path: 'freelancerProfileId',
+      select: 'user profileImage ratePerHour primaryPosition skills expertise certifications rating location',
+      populate: {
+        path: 'user',
+        select: 'name'
+      }
+    })
     .sort({ createdAt: -1 });
+    
+    // Transform the data to include the name directly
+    const transformedApplications = applications.map(app => {
+      const profile = app.freelancerProfileId;
+      return {
+        ...app.toObject(),
+        freelancerProfileId: {
+          ...profile.toObject(),
+          name: profile.user?.name || 'Anonymous'
+        }
+      };
+    });
     
     return res.status(200).json({
       success: true,
-      count: applications.length,
-      data: applications
+      count: transformedApplications.length,
+      data: transformedApplications
     });
   } catch (error) {
     console.error('Error fetching job applications:', error);
@@ -451,7 +462,6 @@ export const getApplicationsByJobId = async (req, res) => {
     });
   }
 };
-
 export const getApplicationsByFreelancerId = async (req, res) => {
   try {
     const userId = req.params.id;

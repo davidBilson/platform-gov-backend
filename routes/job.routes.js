@@ -60,6 +60,7 @@ router.delete('/applications/delete-draft/:id', deleteJobApplicationDraft);
 
 // get applications received from different contractors for a particular job here you get applications by jobId
 router.get('/applications/job/:id', getApplicationsByJobId);
+
 // Get applications sent by a single user (contractor) [HIGHPRIORITY]
 router.get('/applications/contractor/:id', getApplicationsByFreelancerId);
 router.post('/applications/save-draft', upload.single('attachment'), saveJobApplicationDraft);

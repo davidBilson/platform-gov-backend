@@ -32,7 +32,6 @@ const sendSMS = async (phoneNumber, message) => {
       to: formattedPhone
     });
 
-    console.log(`Message sent successfully to ${phoneNumber}, SID: ${result.sid}`);
     return result;
   } catch (error) {
     console.error(`Failed to send SMS to ${phoneNumber}:`, error.message);
