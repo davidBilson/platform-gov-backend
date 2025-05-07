@@ -35,11 +35,12 @@ const hiringSchema = new mongoose.Schema({
     paymentType: {
       type: String,
       enum: ['hourly', 'fixed-price', 'retainer'],
-      required: true
+      required: true,
+      default: 'hourly'
     },
     employmentType: {
       type: String,
-      enum: ['full-time', 'part-time', 'contract'],
+      enum: ['one-time', 'full-time', 'part-time'],  // Updated to match frontend options
       required: true
     },
     startDate: {
@@ -69,11 +70,13 @@ const hiringSchema = new mongoose.Schema({
   }],
   clientNotes: {
     type: String,
-    trim: true
+    trim: true,
+    default: ''
   },
   contractorNotes: {
     type: String,
-    trim: true
+    trim: true,
+    default: ''
   },
   createdAt: {
     type: Date,
@@ -98,6 +101,11 @@ hiringSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   next();
 });
+
+// Validation for employment type
+hiringSchema.path('offerDetails.employmentType').validate(function(value) {
+  return ['one-time', 'full-time', 'part-time'].includes(value);
+}, 'Invalid employment type');
 
 const Hiring = mongoose.model('Hiring', hiringSchema);
 export default Hiring;

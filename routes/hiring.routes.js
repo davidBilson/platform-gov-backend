@@ -1,9 +1,9 @@
 import express from 'express';
-import { createHiringOffer, acceptHiringOffer } from '../controllers/hiring.controller';
+import { createHiringOffer, acceptHiringOffer } from '../controllers/hiring.controller.js';
 
 const router = express.Router();
 
-router.post('/', createHiringOffer);
+router.post('/sending-hiring-contract', createHiringOffer);
 
 router.put('/:id/accept', acceptHiringOffer);
 
