@@ -109,7 +109,7 @@ const jobApplicationSchema = new mongoose.Schema({
   // Application status tracking
   status: {
     type: String,
-    enum: ['draft', 'pending', 'viewed', 'shortlisted', 'interviewed', 'accepted', 'rejected', 'withdrawn'],
+    enum: ['draft', 'pending', 'viewed', 'active'],
     default: 'draft'
   },
   clientNotes: {
