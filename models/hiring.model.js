@@ -21,6 +21,14 @@ const hiringSchema = new mongoose.Schema({
     ref: 'JobApplications',
     required: true
   },
+  contractorSigned: {
+    type: Boolean,
+    default: false
+  },
+  clientSigned: {
+    type: Boolean,
+    default: true
+  },
   status: {
     type: String,
     enum: ['offered', 'accepted', 'declined', 'withdrawn'],

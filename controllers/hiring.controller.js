@@ -105,15 +105,14 @@ export const createHiringOffer = async (req, res) => {
 
 export const acceptHiringOffer = async (req, res) => {
   try {
-    // First handle the file upload
     handleFileUpload(req, res, async (err) => {
       if (err) {
         console.error('File upload error:', err);
         return res.status(400).json({ error: 'File upload failed', details: err.message });
       }
 
-      const { hiringId } = req.params;
-      const { contractorNotes } = req.body;
+      const hiringId = req.params.id;
+      const { contractorNotes, contractorId } = req.body;
       
       const documents = req.files || [];
       
@@ -123,7 +122,6 @@ export const acceptHiringOffer = async (req, res) => {
         const uploadPromises = documents.map(async (file) => {
           try {
             const uploadResult = await uploadFile(file.buffer, 'hiring-documents/contractor');
-            
             return {
               url: uploadResult.secure_url,
               publicId: uploadResult.public_id,
@@ -142,9 +140,13 @@ export const acceptHiringOffer = async (req, res) => {
         contractorDocuments = results.filter(doc => doc !== null);
       }
 
-      const hiring = await Hiring.findById(hiringId);
+      const hiring = await Hiring.findOne({
+        _id: hiringId,
+        contractorId // Verify contractor owns this offer
+      });
+      
       if (!hiring) {
-        return res.status(404).json({ error: 'Hiring offer not found' });
+        return res.status(404).json({ error: 'Hiring offer not found or unauthorized' });
       }
       
       const allDocuments = [...hiring.documents, ...contractorDocuments];
@@ -178,6 +180,52 @@ export const acceptHiringOffer = async (req, res) => {
     });
   }
 };
+export const getHiringOffer = async (req, res) => {
+  try {
+    const { jobId, applicationId } = req.body;
+
+    // Validate all required fields exist
+    if (!jobId || !applicationId) {
+      return res.status(400).json({ 
+        error: 'Missing required fields. Please provide jobId, and applicationId' 
+      });
+    }
+
+    // Validate all IDs
+    if (!mongoose.Types.ObjectId.isValid(jobId) || !mongoose.Types.ObjectId.isValid(applicationId)) {
+      return res.status(400).json({ error: 'One or more invalid ID formats' });
+    }
+
+    // Find the hiring offer
+    const hiringOffer = await Hiring.findOne({
+      jobId,
+      applicationId,
+    })
+    .populate('jobId', 'title description')
+    .populate('clientId', 'firstName lastName email')
+    .populate('contractorId', 'firstName lastName email')
+    .populate('applicationId', 'coverLetter');
+
+    if (!hiringOffer) {
+      return res.status(404).json({ 
+        error: 'Hiring offer not found or you are not authorized to view this offer' 
+      });
+    }
+
+    res.json({
+      success: true,
+      data: hiringOffer,
+      message: 'Hiring offer retrieved successfully'
+    });
+
+  } catch (error) {
+    console.error('Error retrieving hiring offer:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to retrieve hiring offer'
+    });
+  }
+};
 
 // Helper function remains the same
 export const deleteHiringDocuments = async (hiringId) => {
@@ -200,5 +248,80 @@ export const deleteHiringDocuments = async (hiringId) => {
     await Promise.all(deletePromises);
   } catch (error) {
     console.error('Error deleting hiring documents:', error);
+  }
+};
+
+export const contractorSignHiringOffer = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { contractorId } = req.body; // Get contractorId from request body
+
+    if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(contractorId)) {
+      return res.status(400).json({ error: 'Invalid ID format' });
+    }
+
+    const updatedHiring = await Hiring.findOneAndUpdate(
+      {
+        _id: id,
+        contractorId // Ensure the contractor owns this hiring offer
+      },
+      {
+        contractorSigned: true,
+        updatedAt: new Date()
+      },
+      { new: true }
+    );
+
+    if (!updatedHiring) {
+      return res.status(404).json({ error: 'Hiring offer not found or unauthorized' });
+    }
+
+    res.json({
+      success: true,
+      data: updatedHiring,
+      message: 'Contractor signed the hiring offer successfully'
+    });
+
+  } catch (error) {
+    console.error('Error signing hiring offer:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to sign hiring offer'
+    });
+  }
+};
+
+
+export const getContractorSignature = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { contractorId } = req.query; // Get contractorId from query params
+
+    if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(contractorId)) {
+      return res.status(400).json({ error: 'Invalid ID format' });
+    }
+
+    const hiring = await Hiring.findOne({
+      _id: id,
+      contractorId
+    });
+
+    if (!hiring) {
+      return res.status(404).json({ error: 'Hiring offer not found or unauthorized' });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        contractorSigned: hiring.contractorSigned || false
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting contractor signature:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to get signature status'
+    });
   }
 };
