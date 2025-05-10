@@ -23,7 +23,7 @@ const httpServer = createServer(app);
 // Initialize Socket.io with simplified configuration
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: process.env.FRONTEND_URL,
     methods: ["GET", "POST"],
     credentials: true
   },
