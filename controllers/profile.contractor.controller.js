@@ -107,12 +107,20 @@ export const getContractorProfile = async (req, res) => {
     }
     
     // Try string match first (in case the model expects string IDs)
-    let profile = await ContractorProfile.findOne({ user: userId });
+    let profile = await ContractorProfile.findOne({ user: userId })
+      .populate({
+        path: 'user',
+        select: 'name'
+      });
     
     // If not found, try with ObjectId
     if (!profile) {
       const objectId = new mongoose.Types.ObjectId(userId.toString());
-      profile = await ContractorProfile.findOne({ user: objectId });
+      profile = await ContractorProfile.findOne({ user: objectId })
+        .populate({
+          path: 'user',
+          select: 'name'
+        });
     }
     
     if (!profile) {
@@ -121,11 +129,17 @@ export const getContractorProfile = async (req, res) => {
         message: 'Contractor profile not found'
       });
     }
+
+    const profileWithName = {
+      ...profile.toObject(),
+      name: profile.user?.name || 'Anonymous'
+    };
     
     res.status(200).json({
       success: true,
-      data: profile
+      data: profileWithName
     });
+
   } catch (error) {
     res.status(500).json({
       success: false,

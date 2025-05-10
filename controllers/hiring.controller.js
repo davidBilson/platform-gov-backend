@@ -11,8 +11,7 @@ const upload = multer({
   },
 });
 
-// Create a middleware function for handling multiple files
-const handleFileUpload = upload.array('documents'); // 'documents' should match your FormData field name
+const handleFileUpload = upload.array('documents');
 
 export const createHiringOffer = async (req, res) => {
   try {
@@ -322,6 +321,43 @@ export const getContractorSignature = async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to get signature status'
+    });
+  }
+};
+
+export const getClientHiringOffers = async (req, res) => {
+  try {
+    const clientId = req.params.id;
+
+    if (!mongoose.Types.ObjectId.isValid(clientId)) {
+      return res.status(400).json({ error: 'Invalid client ID format' });
+    }
+
+    const hiringOffers = await Hiring.find({ clientId })
+      .populate('jobId', 'jobTitle description')
+      .populate('contractorId', 'name email profileImage')
+      .populate('applicationId', 'coverLetter')
+      .sort({ createdAt: -1 }); // Sort by newest first
+
+    if (!hiringOffers || hiringOffers.length === 0) {
+      return res.status(404).json({ 
+        success: true,
+        data: [],
+        message: 'No hiring offers found for this client' 
+      });
+    }
+
+    res.json({
+      success: true,
+      data: hiringOffers,
+      message: 'Client hiring offers retrieved successfully'
+    });
+
+  } catch (error) {
+    console.error('Error retrieving client hiring offers:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to retrieve client hiring offers'
     });
   }
 };

@@ -403,6 +403,62 @@ export const updateJobApplicationAttachments = async (req, res) => {
     });
   }
 };
+
+export const getApplicationById = async (req, res) => {
+  try {
+    const applicationId = req.params.id;
+
+    if (!mongoose.Types.ObjectId.isValid(applicationId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid Application/Proposal ID format' 
+      });
+    }
+
+    const application = await JobApplication.findById(applicationId)
+      .populate({
+        path: 'jobId',
+        select: 'jobTitle description userId clientName clientLogo status'
+      })
+      .populate({
+        path: 'freelancerProfileId',
+        select: 'user profileImage ratePerHour primaryPosition skills',
+        populate: {
+          path: 'user',
+          select: 'name email'
+        }
+      })
+      .populate('messageThreadId');
+
+    if (!application) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Application/Proposal not found' 
+      });
+    }
+
+    const responseData = {
+      ...application.toObject(),
+      freelancerName: application.freelancerProfileId?.user?.name,
+      clientName: application.jobId.clientName,
+      jobTitle: application.jobId.jobTitle
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: responseData
+    });
+
+  } catch (error) {
+    console.error('Error fetching application:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'An error occurred while fetching the application',
+      error: error.message
+    });
+  }
+};
+
 export const getApplicationsByJobId = async (req, res) => {
   try {
     const jobId = req.params.id;
@@ -462,6 +518,7 @@ export const getApplicationsByJobId = async (req, res) => {
     });
   }
 };
+
 export const getApplicationsByFreelancerId = async (req, res) => {
   try {
     const userId = req.params.id;

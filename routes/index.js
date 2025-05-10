@@ -4,6 +4,7 @@ import profileRoutes from './profile.routes.js';
 import jobRoutes from './job.routes.js';
 import hiringRoutes from './hiring.routes.js';
 import statusRoutes from './status.routes.js';
+import chatRoutes from './chat.routes.js';
 
 const router = express.Router();
 
@@ -16,5 +17,7 @@ router.use('/job', jobRoutes);
 router.use('/hiring', hiringRoutes);
 
 router.use('/status', statusRoutes);
+
+router.use('/chat', chatRoutes);
 
 export default router;
