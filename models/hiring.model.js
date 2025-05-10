@@ -19,7 +19,8 @@ const hiringSchema = new mongoose.Schema({
   applicationId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'JobApplications',
-    required: true
+    required: true,
+    unique: true  // This creates an index automatically
   },
   contractorSigned: {
     type: Boolean,
@@ -48,7 +49,7 @@ const hiringSchema = new mongoose.Schema({
     },
     employmentType: {
       type: String,
-      enum: ['one-time', 'full-time', 'part-time'],  // Updated to match frontend options
+      enum: ['one-time', 'full-time', 'part-time'],
       required: true
     },
     startDate: {
@@ -97,12 +98,6 @@ const hiringSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
-
-// Indexes
-hiringSchema.index({ jobId: 1 });
-hiringSchema.index({ clientId: 1 });
-hiringSchema.index({ contractorId: 1 });
-hiringSchema.index({ status: 1 });
 
 // Document middleware
 hiringSchema.pre('save', function(next) {
