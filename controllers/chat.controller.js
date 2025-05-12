@@ -2,11 +2,10 @@ import { Message, MessageThread } from '../models/messaging.system.model.js';
 
 export const getMessages = async (req, res) => {
   try {
-    const hiringId = req.params.id;
+    const { jobId, proposalId } = req.params;
+    const threadId = `${jobId}-${proposalId}`;
 
-    console.log("hit getMessages")
-
-    const messages = await Message.find({ threadId: hiringId })
+    const messages = await Message.find({ threadId })
       .sort({ createdAt: 1 })
       .populate('sender', 'name profilePicture')
       .populate('recipient', 'name profilePicture');
@@ -19,32 +18,31 @@ export const getMessages = async (req, res) => {
 
 export const sendMessage = async (req, res) => {
   try {
-    const hiringId = req.params.id;
+    const { jobId, proposalId } = req.params;
     const { senderId, recipientId, content } = req.body;
+    const threadId = `${jobId}-${proposalId}`;
 
     const newMessage = new Message({
-      threadId: hiringId,
+      threadId,
       sender: senderId,
       recipient: recipientId,
       content: content
     });
     
     const savedMessage = await newMessage.save();
-    console.log('Message saved:', savedMessage);
 
-    await MessageThread.findByIdAndUpdate(
-      hiringId,
-      { lastMessage: new Date() }
+    await MessageThread.findOneAndUpdate(
+      { _id: threadId },
+      { lastMessage: new Date() },
+      { upsert: true, new: true }
     );
 
-    // Populate sender/recipient before returning
     const populatedMessage = await Message.populate(savedMessage, [
       { path: 'sender', select: 'name profilePicture' },
       { path: 'recipient', select: 'name profilePicture' }
     ]);
 
-    // Broadcast to all clients in the room
-    req.app.get('io').to(hiringId).emit('receive-message', populatedMessage);
+    req.app.get('io').to(threadId).emit('receive-message', populatedMessage);
 
     res.status(201).json(populatedMessage);
   } catch (error) {
@@ -55,20 +53,19 @@ export const sendMessage = async (req, res) => {
 
 export const getOrCreateThread = async (req, res) => {
   try {
-    const { hiringId, clientId, contractorId, jobId } = req.body;
-
-    console.log("hit getOrCreateThread")
+    const { jobId, proposalId, clientId, contractorId } = req.body;
+    const threadId = `${jobId}-${proposalId}`;
 
     let thread = await MessageThread.findOne({ 
-      _id: hiringId 
+      _id: threadId 
     });
 
     if (!thread) {
       thread = new MessageThread({
-        _id: hiringId,
+        _id: threadId,
         participants: [clientId, contractorId],
         jobId,
-        contractId: hiringId
+        applicationId: proposalId
       });
       await thread.save();
     }

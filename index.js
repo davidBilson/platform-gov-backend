@@ -71,10 +71,10 @@ const configureSocketIO = () => {
       console.error('Socket error:', error);
     });
     
-    // Room management
-    socket.on('join-hiring-chat', (hiringId) => {
-      socket.join(hiringId);
-      console.log(`User ${socket.id} joined hiring chat ${hiringId}`);
+    // Room management for chat rooms based on jobId and proposalId
+    socket.on('join-chat-room', (roomId) => {
+      socket.join(roomId);
+      console.log(`User ${socket.id} joined chat room ${roomId}`);
     });
 
     // Disconnection handling

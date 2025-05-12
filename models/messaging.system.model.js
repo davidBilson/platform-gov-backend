@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const messageSchema = new mongoose.Schema({
   threadId: {
-    type: mongoose.Schema.Types.ObjectId,
+    type: String,
     required: true,
     index: true
   },
@@ -39,6 +39,9 @@ const messageSchema = new mongoose.Schema({
 });
 
 const messageThreadSchema = new mongoose.Schema({
+  _id: {
+    type: String
+  },
   participants: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

@@ -44,11 +44,6 @@ export const trackJobStatus = async (req, res) => {
   }
 };
 
-/**
- * @desc    Track the hiring status for a job
- * @route   GET /api/status/track-hiring-status
- * @access  Private
- */
 export const trackHiringStatus = async (req, res) => {
   try {
     const { jobId, contractorId, clientId } = req.body;

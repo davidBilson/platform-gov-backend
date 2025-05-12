@@ -3,30 +3,15 @@ import ContractorProfile from '../models/profile.contractor.model.js';
 import User from '../models/user.model.js';
 import { deleteImage, getPublicIdFromUrl } from '../utils/cloudinary.js';
 
-/**
- * Validate ObjectId
- * @param {string} id - ID to validate
- * @returns {boolean} - Is valid ObjectId
- */
 const isValidObjectId = (id) => {
   return mongoose.Types.ObjectId.isValid(id);
 };
 
-/**
- * Convert ID to ObjectId if valid
- * @param {string} id - ID to convert
- * @returns {ObjectId|null} - Mongoose ObjectId or null if invalid
- */
 const toObjectId = (id) => {
   if (!id || !isValidObjectId(id)) return null;
   return new mongoose.Types.ObjectId(id.toString());
 };
 
-/**
- * Parse array field from request
- * @param {string|Array} field - Field to parse
- * @returns {Array} - Parsed array
- */
 const parseArrayField = (field) => {
   if (!field) return [];
   if (Array.isArray(field)) return field;
@@ -37,20 +22,13 @@ const parseArrayField = (field) => {
   }
 };
 
-/**
- * Get all contractor profiles
- * @route GET /api/profile/contractors
- * @access Public
- */
 export const getAllContractorProfiles = async (req, res) => {
   try {
-    // Get all contractor profiles
+
     const profiles = await ContractorProfile.find();
     
-    // Create an array to store the enhanced profiles
     const enhancedProfiles = [];
     
-    // Fetch additional user information for each profile
     for (const profile of profiles) {
       // Get user details using the user ID from the profile
       const user = await User.findById(profile.user).select('name email phoneNumber');
@@ -87,18 +65,10 @@ export const getAllContractorProfiles = async (req, res) => {
   }
 };
 
-
-
-/**
- * Get profile by user ID
- * @route GET /api/profile/:userId
- * @access Public
- */
 export const getContractorProfile = async (req, res) => {
   try {
     const userId = req.params.id;
     
-    // First check if the ID is valid
     if (!userId || !isValidObjectId(userId)) {
       return res.status(400).json({
         success: false,
@@ -106,14 +76,12 @@ export const getContractorProfile = async (req, res) => {
       });
     }
     
-    // Try string match first (in case the model expects string IDs)
     let profile = await ContractorProfile.findOne({ user: userId })
       .populate({
         path: 'user',
         select: 'name'
       });
     
-    // If not found, try with ObjectId
     if (!profile) {
       const objectId = new mongoose.Types.ObjectId(userId.toString());
       profile = await ContractorProfile.findOne({ user: objectId })
@@ -148,11 +116,6 @@ export const getContractorProfile = async (req, res) => {
   }
 };
 
-/**
- * Create a new profile
- * @route POST /api/profile
- * @access Private
- */
 export const createContractorProfile = async (req, res) => {
   try {
     const userId = req.body.userId;
@@ -218,11 +181,6 @@ export const createContractorProfile = async (req, res) => {
   }
 };
 
-/**
- * Update a profile
- * @route PUT /api/profile/:id
- * @access Private
- */
 export const updateContractorProfile = async (req, res) => {
   try {
     const userId = req.params.id;
@@ -318,11 +276,6 @@ export const updateContractorProfile = async (req, res) => {
   }
 };
 
-/**
- * Delete a profile
- * @route DELETE /api/profile/:id
- * @access Private
- */
 export const deleteContractorProfile = async (req, res) => {
   try {
     const userId = req.params.id;
@@ -376,12 +329,6 @@ export const deleteContractorProfile = async (req, res) => {
   }
 };
 
-/**
- * Get current user's profile (included for compatibility with frontend)
- * Note: This is essentially the same as getContractorProfile but uses query parameter
- * @route GET /api/profile/me
- * @access Public
- */
 export const getMyProfile = async (req, res) => {
   try {
     // Get userId from query parameter
@@ -419,11 +366,6 @@ export const getMyProfile = async (req, res) => {
   }
 };
 
-/**
- * Search profiles by skills, expertise, or certifications
- * @route GET /api/profile/search
- * @access Public
- */
 export const searchProfiles = async (req, res) => {
   try {
     const { skills, expertise, certifications, query, limit = 20, skip = 0 } = req.query;
@@ -475,11 +417,6 @@ export const searchProfiles = async (req, res) => {
   }
 };
 
-/**
- * Get all available skills
- * @route GET /api/profile/skills
- * @access Public
- */
 export const getAllSkills = async (req, res) => {
   try {
     const skills = await ContractorProfile.distinct('skills');
@@ -498,11 +435,6 @@ export const getAllSkills = async (req, res) => {
   }
 };
 
-/**
- * Get all available expertise areas
- * @route GET /api/profile/expertise
- * @access Public
- */
 export const getAllExpertise = async (req, res) => {
   try {
     const expertise = await ContractorProfile.distinct('expertise');
@@ -521,11 +453,6 @@ export const getAllExpertise = async (req, res) => {
   }
 };
 
-/**
- * Get all available certifications
- * @route GET /api/profile/certifications
- * @access Public
- */
 export const getAllCertifications = async (req, res) => {
   try {
     const certifications = await Profile.distinct('certifications');

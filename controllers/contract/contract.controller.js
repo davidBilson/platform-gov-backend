@@ -90,20 +90,19 @@ export const createContract = async (req, res) => {
   }
 };
 
-
 export const getSingleContract = async (req, res) => {
   try {
-    const { hiringId, clientId, contractorId } = req.body;
+    const { jobId, clientId, contractorId } = req.body;
 
-    if (!hiringId || !clientId || !contractorId) {
+    if (!jobId || !clientId || !contractorId) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: hiringId, clientId, or contractorId'
+        message: 'Missing required fields: jobId, clientId, or contractorId'
       });
     }
 
     const contract = await Contract.findOne({
-      hiringId,
+      jobId,
       clientId,
       contractorId
     })

@@ -1,12 +1,15 @@
 // profile.routes.js
 import express from 'express';
+import ContractorProfile from '../models/profile.contractor.model.js';
+import ClientProfile from '../models/profile.client.model.js';
+import mongoose from 'mongoose';
 
 import {
     createContractorProfile,
     updateContractorProfile,
     getContractorProfile,
     deleteContractorProfile,
-    getAllContractorProfiles
+    getAllContractorProfiles,
 } from '../controllers/profile.contractor.controller.js';
 
 import {
@@ -14,7 +17,7 @@ import {
     updateClientProfile,
     getClientProfile,
     deleteClientProfile,
-    getAllClientProfiles
+    getAllClientProfiles,
 } from '../controllers/profile.client.controller.js';
 
 import { upload } from '../middleware/multer-image-upload.js';
@@ -35,6 +38,60 @@ router.get('/fetch-all-contractors', getAllContractorProfiles);
 router.get('/fetch-contractor-profile/:id', getContractorProfile);
 router.put('/update-contractor-profile/:id', updateContractorProfile);
 router.delete('/delete-contractor-profile/:id', deleteContractorProfile);
+
+// IMAGE FETCH ROUTE
+const isValidObjectId = (id) => {
+  return mongoose.Types.ObjectId.isValid(id);
+};
+
+router.get('/get-profile-image/:id', async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    if (!userId || !isValidObjectId(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID'
+      });
+    }
+
+    // Try finding in ContractorProfile first
+    const contractorProfile = await ContractorProfile.findOne({ user: userId })
+      .select('profileImage')
+      .lean();
+
+    if (contractorProfile) {
+      return res.status(200).json({
+        success: true,
+        data: contractorProfile.profileImage ||''
+      });
+    }
+
+    // If not found in ContractorProfile, try ClientProfile
+    const clientProfile = await ClientProfile.findOne({ user: userId })
+      .select('logo')
+      .lean();
+
+    if (clientProfile) {
+      return res.status(200).json({
+        success: true,
+        data: clientProfile.logo || ''
+      });
+    }
+
+    // If not found in either collection
+    return res.status(404).json({
+      success: false,
+      message: 'Profile not found in either contractor or client profiles'
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Internal server error'
+    });
+  }
+})
 
 // IMAGE UPLOAD ROUTE
 router.post('/upload-profile-image', upload.single('profileImage'), async (req, res) => {
