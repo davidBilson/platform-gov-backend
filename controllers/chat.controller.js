@@ -1,4 +1,5 @@
 import { Message, MessageThread } from '../models/messaging.system.model.js';
+import mongoose from 'mongoose';
 
 export const getMessages = async (req, res) => {
   try {
@@ -22,6 +23,22 @@ export const sendMessage = async (req, res) => {
     const { senderId, recipientId, content } = req.body;
     const threadId = `${jobId}-${proposalId}`;
 
+    // Create or update thread with participants
+    await MessageThread.findOneAndUpdate(
+      { _id: threadId },
+      { 
+        $set: { 
+          lastMessage: new Date(),
+          jobId,
+          applicationId: proposalId
+        },
+        $addToSet: { 
+          participants: { $each: [senderId, recipientId] } 
+        }
+      },
+      { upsert: true, new: true }
+    );
+
     const newMessage = new Message({
       threadId,
       sender: senderId,
@@ -30,13 +47,6 @@ export const sendMessage = async (req, res) => {
     });
     
     const savedMessage = await newMessage.save();
-
-    await MessageThread.findOneAndUpdate(
-      { _id: threadId },
-      { lastMessage: new Date() },
-      { upsert: true, new: true }
-    );
-
     const populatedMessage = await Message.populate(savedMessage, [
       { path: 'sender', select: 'name profilePicture' },
       { path: 'recipient', select: 'name profilePicture' }
@@ -56,22 +66,104 @@ export const getOrCreateThread = async (req, res) => {
     const { jobId, proposalId, clientId, contractorId } = req.body;
     const threadId = `${jobId}-${proposalId}`;
 
-    let thread = await MessageThread.findOne({ 
-      _id: threadId 
-    });
-
-    if (!thread) {
-      thread = new MessageThread({
-        _id: threadId,
-        participants: [clientId, contractorId],
-        jobId,
-        applicationId: proposalId
-      });
-      await thread.save();
-    }
+    let thread = await MessageThread.findOneAndUpdate(
+      { _id: threadId },
+      { 
+        $set: { jobId, applicationId: proposalId },
+        $addToSet: { participants: { $each: [clientId, contractorId] } }
+      },
+      { upsert: true, new: true }
+    );
 
     res.json(thread);
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+export const getUserConversations = async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId.toString())) {
+      return res.status(400).json({ message: 'Valid user ID is required' });
+    }
+
+    // Get all threads where user is a participant
+    const threads = await MessageThread.find({
+      participants: userId
+    })
+    .populate({
+      path: 'participants',
+      select: 'name',
+      model: 'User'
+    })
+    .populate({
+      path: 'jobId',
+      select: 'jobTitle',
+      model: 'Jobs'
+    })
+    .sort({ lastMessage: -1 });
+
+    // Get conversation details for each thread
+    const conversations = await Promise.all(
+      threads.map(async (thread) => {
+        // Find the other participant
+        const otherParticipant = thread.participants.find(
+          (p) => p._id.toString() !== userId.toString()
+        );
+
+        // Get last message
+        const lastMessage = await Message.findOne({ threadId: thread._id })
+          .sort({ createdAt: -1 })
+          .lean();
+
+        // Count unread messages
+        const unreadCount = await Message.countDocuments({
+          threadId: thread._id,
+          recipient: userId,
+          isRead: false
+        });
+
+        return {
+          threadId: thread._id,
+          jobId: thread.jobId?._id,
+          jobTitle: thread.jobId?.jobTitle,
+          otherUser: {
+            id: otherParticipant?._id,
+            name: otherParticipant?.name || 'Unknown User',
+          },
+          lastMessage: {
+            content: lastMessage?.content || 'No messages yet',
+            isCurrentUser: lastMessage?.sender.toString() === userId.toString(),
+            createdAt: lastMessage?.createdAt || thread.createdAt
+          },
+          unreadCount
+        };
+      })
+    );
+
+    // Add GovLink as first conversation
+    conversations.unshift({
+      threadId: 'govlink',
+      otherUser: {
+        id: new mongoose.Types.ObjectId(),
+        name: 'GovLink'
+      },
+      lastMessage: {
+        content: 'Official government communications',
+        isCurrentUser: false,
+        createdAt: new Date()
+      },
+      unreadCount: 0
+    });
+
+    res.json({
+      count: conversations.length - 1, // Exclude GovLink
+      conversations
+    });
+  } catch (error) {
+    console.error('Error fetching conversations:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };

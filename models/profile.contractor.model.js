@@ -75,6 +75,11 @@ const contractorProfileSchema = new Schema({
     type: String,
     default: ''
   },
+  clearance: {  // Add this field
+    type: String,
+    trim: true,
+    default: ''
+  },
   ratePerHour: {
     type: Number,
     default: 0
