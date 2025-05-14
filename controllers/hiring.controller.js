@@ -1,98 +1,93 @@
 import mongoose from 'mongoose';
-import multer from 'multer'; // Import multer directly
 import { uploadFile } from '../utils/cloudinary.js';
 import Hiring from '../models/hiring.model.js';
-
-// Configure multer in memory (no disk storage needed for Cloudinary)
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit per file
-  },
-});
-
-const handleFileUpload = upload.array('documents');
+import path from 'path';
 
 export const createHiringOffer = async (req, res) => {
   try {
-    // First handle the file upload
-    handleFileUpload(req, res, async (err) => {
-      
-      if (err) {
-        console.error('File upload error:', err);
-        return res.status(400).json({ error: 'File upload failed', details: err.message });
-      }
-      
-      const {
-        jobId,
-        clientId,
-        contractorId,
-        applicationId,
-        rate,
-        employmentType,
-        startDate,
-        clientNotes
-      } = req.body;
+    // req.file is now available from the Multer middleware
+    const file = req.file;
+    
+    // Parse the text fields from form-data
+    const {
+      jobId,
+      clientId,
+      contractorId,
+      applicationId,
+      rate,
+      employmentType,
+      startDate,
+      clientNotes = ''
+    } = req.body;
 
-      const documents = req.files || [];
+    // Validate required fields
+    if (!jobId || !clientId || !contractorId || !applicationId || !rate || !employmentType || !startDate) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
 
-      if (
-        !mongoose.Types.ObjectId.isValid(jobId) ||
-        !mongoose.Types.ObjectId.isValid(clientId) ||
-        !mongoose.Types.ObjectId.isValid(contractorId) ||
-        !mongoose.Types.ObjectId.isValid(applicationId)
-      ) {
-        return res.status(400).json({ error: 'Invalid ID format' });
-      }
+    // Validate IDs
+    if (
+      !mongoose.Types.ObjectId.isValid(jobId) ||
+      !mongoose.Types.ObjectId.isValid(clientId) ||
+      !mongoose.Types.ObjectId.isValid(contractorId) ||
+      !mongoose.Types.ObjectId.isValid(applicationId)
+    ) {
+      return res.status(400).json({ error: 'Invalid ID format' });
+    }
 
-      let uploadedDocuments = [];
-      if (documents.length > 0) {
-        const uploadPromises = documents.map(async (file) => {
-          try {
-            const uploadResult = await uploadFile(file.buffer, 'hiring-documents');
-            
-            return {
-              url: uploadResult.secure_url,
-              publicId: uploadResult.public_id,
-              format: uploadResult.format,
-              resourceType: uploadResult.resource_type,
-              originalName: file.originalname,
-              size: uploadResult.bytes
-            };
-          } catch (uploadError) {
-            console.error('Error uploading file:', uploadError);
-            return null;
-          }
+    // Process file upload if exists
+    let uploadedDocuments = [];
+    if (file) {
+      try {
+        const uploadResult = await uploadFile(
+          file.buffer,
+          'hiring-documents',
+          null,
+          file.originalname
+        );
+    
+        uploadedDocuments.push({
+          url: uploadResult.secure_url,
+          publicId: uploadResult.public_id,
+          format: uploadResult.format || path.extname(file.originalname).slice(1),
+          resourceType: uploadResult.resource_type,
+          originalName: file.originalname,
+          size: uploadResult.bytes || file.size
         });
-        
-        const results = await Promise.all(uploadPromises);
-        uploadedDocuments = results.filter(doc => doc !== null);
+      } catch (uploadError) {
+        console.error('Detailed upload error:', uploadError);
+        return res.status(500).json({ 
+          error: 'Failed to upload document',
+          details: uploadError.message 
+        });
       }
+    }
 
-      const newHiring = new Hiring({
-        jobId,
-        clientId,
-        contractorId,
-        applicationId,
-        offerDetails: {
-          rate: parseFloat(rate),
-          paymentType: 'hourly',
-          employmentType,
-          startDate: new Date(startDate)
-        },
-        documents: uploadedDocuments,
-        clientNotes: clientNotes || '',
-        status: 'offered'
-      });
-
-      await newHiring.save();
-
-      res.status(201).json({
-        success: true,
-        data: newHiring,
-        message: 'Hiring offer created successfully'
-      });
+    // Rest of your controller logic remains the same...
+    const newHiring = new Hiring({
+      jobId,
+      clientId,
+      contractorId,
+      applicationId,
+      offerDetails: {
+        rate: parseFloat(rate),
+        paymentType: 'hourly',
+        employmentType,
+        startDate: new Date(startDate)
+      },
+      documents: uploadedDocuments,
+      clientNotes,
+      status: 'offered'
     });
+
+    await newHiring.save();
+
+    res.status(201).json({
+      success: true,
+      data: newHiring,
+      message: 'Hiring offer created successfully'
+    });
+
   } catch (error) {
     console.error('Error creating hiring offer:', error);
     res.status(500).json({
@@ -104,73 +99,35 @@ export const createHiringOffer = async (req, res) => {
 
 export const acceptHiringOffer = async (req, res) => {
   try {
-    handleFileUpload(req, res, async (err) => {
-      if (err) {
-        console.error('File upload error:', err);
-        return res.status(400).json({ error: 'File upload failed', details: err.message });
-      }
+    const id = req.params.id;
+    const { contractorId } = req.body;
 
-      const hiringId = req.params.id;
-      const { contractorNotes, contractorId } = req.body;
-      
-      const documents = req.files || [];
-      
-      let contractorDocuments = [];
-      
-      if (documents.length > 0) {
-        const uploadPromises = documents.map(async (file) => {
-          try {
-            const uploadResult = await uploadFile(file.buffer, 'hiring-documents/contractor');
-            return {
-              url: uploadResult.secure_url,
-              publicId: uploadResult.public_id,
-              format: uploadResult.format,
-              resourceType: uploadResult.resource_type,
-              originalName: file.originalname,
-              size: uploadResult.bytes
-            };
-          } catch (uploadError) {
-            console.error('Error uploading file:', uploadError);
-            return null;
-          }
-        });
-        
-        const results = await Promise.all(uploadPromises);
-        contractorDocuments = results.filter(doc => doc !== null);
-      }
+    if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(contractorId)) {
+      return res.status(400).json({ error: 'Invalid ID format' });
+    }
 
-      const hiring = await Hiring.findOne({
-        _id: hiringId,
-        contractorId // Verify contractor owns this offer
-      });
-      
-      if (!hiring) {
-        return res.status(404).json({ error: 'Hiring offer not found or unauthorized' });
-      }
-      
-      const allDocuments = [...hiring.documents, ...contractorDocuments];
+    const updatedHiring = await Hiring.findOneAndUpdate(
+      {
+        _id: id,
+        contractorId
+      },
+      {
+        status: 'accepted',
+        updatedAt: new Date()
+      },
+      { new: true }
+    );
 
-      const updatedHiring = await Hiring.findByIdAndUpdate(
-        hiringId,
-        {
-          status: 'accepted',
-          contractorNotes: contractorNotes || '',
-          documents: allDocuments,
-          updatedAt: new Date()
-        },
-        { new: true }
-      );
+    if (!updatedHiring) {
+      return res.status(404).json({ error: 'Hiring offer not found or unauthorized' });
+    }
 
-      if (!updatedHiring) {
-        return res.status(404).json({ error: 'Hiring offer not found' });
-      }
-
-      res.json({
-        success: true,
-        data: updatedHiring,
-        message: 'Hiring offer accepted'
-      });
+    res.json({
+      success: true,
+      data: updatedHiring,
+      message: 'Hiring offer accepted'
     });
+
   } catch (error) {
     console.error('Error accepting hiring offer:', error);
     res.status(500).json({
@@ -179,6 +136,8 @@ export const acceptHiringOffer = async (req, res) => {
     });
   }
 };
+
+
 export const getHiringOffer = async (req, res) => {
   try {
     const { jobId, applicationId } = req.body;

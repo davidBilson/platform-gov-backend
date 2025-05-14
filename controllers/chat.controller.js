@@ -159,7 +159,7 @@ export const getUserConversations = async (req, res) => {
     });
 
     res.json({
-      count: conversations.length - 1, // Exclude GovLink
+      count: conversations.length - 1,
       conversations
     });
   } catch (error) {

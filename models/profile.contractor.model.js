@@ -88,6 +88,10 @@ const contractorProfileSchema = new Schema({
     type: String,
     trim: true
   },
+  profession: {
+    type: String,
+    trim: true
+  },
   firmAffiliation: {
     type: String,
     trim: true,

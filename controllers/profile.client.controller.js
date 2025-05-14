@@ -128,6 +128,8 @@ export const createClientProfile = async (req, res) => {
       logo,
       industry: req.body.industry || '',
       size: req.body.size || '',
+      department: req.body.department || "",
+      clearance: req.body.clearance || "",
       specializations,
       locations
     };
@@ -223,6 +225,8 @@ export const updateClientProfile = async (req, res) => {
       overview: req.body.overview || profile.overview,
       industry: req.body.industry || profile.industry,
       size: req.body.size || profile.size,
+      department: req.body.department || profile.department,
+      clearance: req.body.clearance || profile.clearance,
       specializations,
       locations,
       updatedAt: Date.now()

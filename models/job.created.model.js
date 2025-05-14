@@ -63,6 +63,14 @@ const jobSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  clientDepartment: {
+    type: String,
+    trim: true
+  },
+  clientClearance: {
+    type: String,
+    trim: true
+  },
   clientIndustry: {
     type: String,
     trim: true

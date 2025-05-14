@@ -53,6 +53,14 @@ const clientProfileSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  department: {
+    type: String,
+    trim: true
+  },
+  clearance: {
+    type: String,
+    trim: true
+  },
   specializations: {
     type: [String],
     default: []

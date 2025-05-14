@@ -306,6 +306,8 @@ export const createJob = async (req, res) => {
       userId: toObjectId(userId),
       clientName: profile.name,
       clientLogo: profile.logo,
+      clientDepartment: profile.department,
+      clientClearance: profile.clearance,
       clientIndustry: profile.industry,
       clientCompanySize: profile.size,
       clientSpecializations: profile.specializations,
