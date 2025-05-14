@@ -3,30 +3,15 @@ import Job from '../models/job.created.model.js';
 import BusinessProfile from '../models/profile.client.model.js';
 import JobApplication from '../models/job.applications.model.js';
 
-/**
- * Validate ObjectId
- * @param {string} id - ID to validate
- * @returns {boolean} - Is valid ObjectId
- */
 const isValidObjectId = (id) => {
   return mongoose.Types.ObjectId.isValid(id);
 };
 
-/**
- * Convert ID to ObjectId if valid
- * @param {string} id - ID to convert
- * @returns {ObjectId|null} - Mongoose ObjectId or null if invalid
- */
 const toObjectId = (id) => {
   if (!id || !isValidObjectId(id)) return null;
   return new mongoose.Types.ObjectId(id.toString());
 };
 
-/**
- * Parse array field from request
- * @param {string|Array} field - Field to parse
- * @returns {Array} - Parsed array
- */
 const parseArrayField = (field) => {
   if (!field) return [];
   if (Array.isArray(field)) return field;
@@ -37,31 +22,17 @@ const parseArrayField = (field) => {
   }
 };
 
-/**
- * Verify user role based on business profile existence
- * @param {string} userId - User ID to verify
- * @returns {Object} - User role and profile info
- */
 const verifyUserRole = async (userId) => {
   if (!userId || !isValidObjectId(userId)) {
     return { hasValidRole: false, role: null, profile: null };
   }
-  
   const objectId = new mongoose.Types.ObjectId(userId.toString());
-  
-  // Check if user has a business profile
   const businessProfile = await BusinessProfile.findOne({ user: objectId });
-
   if (businessProfile) {
     return { hasValidRole: true, role: 'client', profile: businessProfile,  };
   }
 };
 
-/**
- * Get all jobs
- * @route GET /api/jobs
- * @access Public
- */
 export const getAllJobs = async (req, res) => {
   try {
     // Add pagination
@@ -139,16 +110,10 @@ export const getAllJobs = async (req, res) => {
   }
 };
 
-/**
- * Get job by ID
- * @route GET /api/jobs/:id
- * @access Public
- */
 export const getJobById = async (req, res) => {
   try {
     const jobId = req.params.id;
     
-    // Validate job ID
     if (!jobId || !isValidObjectId(jobId)) {
       return res.status(400).json({
         success: false,
@@ -158,7 +123,6 @@ export const getJobById = async (req, res) => {
     
     const objectId = new mongoose.Types.ObjectId(jobId.toString());
     
-    // Find job and populate user data
     const job = await Job.findById(objectId)
       .populate('userId', 'name email profile');
     
@@ -173,6 +137,7 @@ export const getJobById = async (req, res) => {
       success: true,
       data: job
     });
+
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -181,16 +146,10 @@ export const getJobById = async (req, res) => {
   }
 };
 
-/**
- * Get jobs by user ID
- * @route GET /api/jobs/user/:id
- * @access Private
- */
 export const getJobsByUserId = async (req, res) => {
   try {
     const userId = req.params.id;
     
-    // Validate user ID
     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({
         success: false,
@@ -200,24 +159,20 @@ export const getJobsByUserId = async (req, res) => {
     
     const objectId = new mongoose.Types.ObjectId(userId.toString());
     
-    // Add pagination
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
     
-    // Add status filter if provided
     const filter = { userId: objectId };
     if (req.query.status) {
       filter.status = req.query.status;
     }
-    
-    // Find jobs for this user
+
     const jobs = await Job.find(filter)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
     
-    // Get total count for pagination
     const total = await Job.countDocuments(filter);
     
     // Get proposal counts for each job
@@ -259,11 +214,7 @@ export const getJobsByUserId = async (req, res) => {
     });
   }
 };
-/**
- * Create a new job
- * @route POST /api/jobs
- * @access Private
- */
+
 export const createJob = async (req, res) => {
   try {
     const userId = req.body.userId || req.user?.id;
@@ -325,7 +276,7 @@ export const createJob = async (req, res) => {
       paymentType: req.body.paymentType,
       price: parseFloat(req.body.price),
       milestones,
-      status: req.body.status || 'active'
+      status: req.body.status || 'open'
     };
     
     // Add payment type specific fields
@@ -356,11 +307,73 @@ export const createJob = async (req, res) => {
   }
 };
 
-/**
- * Update job
- * @route PUT /api/jobs/:id
- * @access Private (own jobs only)
- */
+export const updateJobStatus = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { jobId, status } = req.body;
+
+    // Validate user ID
+    if (!userId || !isValidObjectId(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID'
+      });
+    }
+
+    // Validate job ID
+    if (!jobId || !isValidObjectId(jobId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid job ID'
+      });
+    }
+
+    // Validate status
+    if (!status || !['open', 'active', 'closed', 'completed'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Status must be one of: open, active, closed, completed'
+      });
+    }
+
+    const userObjectId = new mongoose.Types.ObjectId(userId.toString());
+    const jobObjectId = new mongoose.Types.ObjectId(jobId.toString());
+
+    // Find and update the specific job
+    const job = await Job.findOneAndUpdate(
+      { 
+        _id: jobObjectId,
+        userId: userObjectId 
+      },
+      { 
+        $set: { 
+          status,
+          updatedAt: Date.now()
+        }
+      },
+      { new: true }
+    );
+
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        message: 'Job not found or you do not have permission to update it'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Job status updated to ${status} successfully`,
+      data: job
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Internal server error'
+    });
+  }
+};
+
 export const updateJob = async (req, res) => {
   try {
     const jobId = req.params.id;

@@ -5,6 +5,7 @@ import {
   getJobsByUserId,
   createJob,
   updateJob,
+  updateJobStatus,
   deleteJob,
   changeJobStatus,
   addOrUpdateMilestone,
@@ -50,6 +51,7 @@ router.get('/get-single/:id', getJobById);
 router.get('/get-jobs-by-user-id/user/:id', getJobsByUserId); //fetch jobs created by client
 router.post('/create', createJob);
 router.put('/update/:id', updateJob);
+router.put('/update-job-status/:id', updateJobStatus)
 router.delete('/delete/:id', deleteJob);
 router.patch('/change-job-status/:id/status', changeJobStatus);
 router.post('/add-or-update-milestone/:id/milestones', addOrUpdateMilestone);

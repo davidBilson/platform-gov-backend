@@ -167,3 +167,33 @@ export const getUserConversations = async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+export const markMessagesAsRead = async (req, res) => {
+  try {
+    const { threadId, userId } = req.params;
+    
+    if (!threadId || !userId) {
+      return res.status(400).json({ message: 'ThreadId and userId are required' });
+    }
+
+    // Update all unread messages where this user is the recipient
+    const result = await Message.updateMany(
+      { 
+        threadId: threadId,
+        recipient: userId,
+        isRead: false
+      },
+      { 
+        $set: { isRead: true } 
+      }
+    );
+
+    res.json({ 
+      success: true, 
+      messagesUpdated: result.modifiedCount 
+    });
+  } catch (error) {
+    console.error('Error marking messages as read:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
