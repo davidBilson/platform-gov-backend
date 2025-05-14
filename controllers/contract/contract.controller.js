@@ -32,10 +32,12 @@ export const createContract = async (req, res) => {
         paymentStructure = 'milestone';
         break;
       case 'hourly':
-        paymentStructure = 'timesheet';
+        // paymentStructure = 'timesheet';
+        paymentStructure = 'milestone';
         break;
       case 'retainer':
-        paymentStructure = 'retainer';
+        // paymentStructure = 'retainer';
+        paymentStructure = 'milestone';
         break;
       default:
         paymentStructure = 'milestone';
