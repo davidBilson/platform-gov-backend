@@ -35,72 +35,15 @@ const verifyUserRole = async (userId) => {
 
 export const getAllJobs = async (req, res) => {
   try {
-    // Add pagination
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-    
-    // Add filtering options
-    const filter = {};
-    
-    // Filter by status - default to active jobs only
-    filter.status = req.query.status || 'active';
-    
-    // Filter by location if provided
-    if (req.query.location) {
-      filter.location = new RegExp(req.query.location, 'i');
-    }
-    
-    // Filter by job title if provided
-    if (req.query.jobTitle) {
-      filter.jobTitle = new RegExp(req.query.jobTitle, 'i');
-    }
-    
-    // Filter by job category if provided
-    if (req.query.jobCategory) {
-      filter.jobCategory = new RegExp(req.query.jobCategory, 'i');
-    }
-    
-    // Filter by employment type if provided
-    if (req.query.employmentType) {
-      filter.employmentType = req.query.employmentType;
-    }
-    
-    // Filter by payment type if provided
-    if (req.query.paymentType) {
-      filter.paymentType = req.query.paymentType;
-    }
-    
-    // Filter by user role if provided
-    if (req.query.userRole) {
-      filter.userRole = req.query.userRole;
-    }
-    
-    // Filter by required skills if provided
-    if (req.query.skills) {
-      const skills = req.query.skills.split(',').map(skill => skill.trim());
-      filter.requiredSkills = { $in: skills };
-    }
-    
-    // Execute query with filters and pagination
-    const jobs = await Job.find(filter)
+    // Get all jobs without pagination or filtering
+    const jobs = await Job.find()
       .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
       .populate('userId', 'name email profile'); // Populate user info
-    
-    // Get total count for pagination
-    const total = await Job.countDocuments(filter);
     
     res.status(200).json({
       success: true,
       data: jobs,
-      pagination: {
-        total,
-        page,
-        limit,
-        pages: Math.ceil(total / limit)
-      }
+      count: jobs.length
     });
   } catch (error) {
     res.status(500).json({

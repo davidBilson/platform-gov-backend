@@ -1,3 +1,4 @@
+// controllers/chat.controller.js (updated)
 import { Message, MessageThread } from '../models/messaging.system.model.js';
 import mongoose from 'mongoose';
 
@@ -20,7 +21,7 @@ export const getMessages = async (req, res) => {
 export const sendMessage = async (req, res) => {
   try {
     const { jobId, proposalId } = req.params;
-    const { senderId, recipientId, content } = req.body;
+    const { senderId, recipientId, content, encryptedContent, iv } = req.body;
     const threadId = `${jobId}-${proposalId}`;
 
     // Create or update thread with participants
@@ -43,7 +44,9 @@ export const sendMessage = async (req, res) => {
       threadId,
       sender: senderId,
       recipient: recipientId,
-      content: content
+      content: content,
+      encryptedContent: encryptedContent,
+      iv: iv
     });
     
     const savedMessage = await newMessage.save();
@@ -52,9 +55,30 @@ export const sendMessage = async (req, res) => {
       { path: 'recipient', select: 'name profilePicture' }
     ]);
 
-    req.app.get('io').to(threadId).emit('receive-message', populatedMessage);
+    // Emit to both the chat room and specific users
+    const io = req.app.get('io');
+    
+    // Emit to the chat room
+    io.to(threadId).emit('receive-message', populatedMessage);
+    
+    // Emit to sender with isCurrentUser: true
+    io.to(senderId.toString()).emit('conversation-update', {
+      threadId,
+      message: populatedMessage,
+      isCurrentUser: true,
+      unreadCount: 0 // Sender's messages are always read
+    });
+    
+    // Emit to recipient with isCurrentUser: false
+    io.to(recipientId.toString()).emit('conversation-update', {
+      threadId,
+      message: populatedMessage,
+      isCurrentUser: false,
+      unreadCount: 1 // Increment unread count for recipient
+    });
 
     res.status(201).json(populatedMessage);
+
   } catch (error) {
     console.error('Error sending message:', error);
     res.status(500).json({ message: error.message });

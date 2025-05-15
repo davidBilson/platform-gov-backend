@@ -21,6 +21,12 @@ const messageSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  encryptedContent: {
+    type: String
+  },
+  iv: {
+    type: String
+  },
   attachments: [{
     filename: String,
     originalName: String,

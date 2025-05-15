@@ -62,40 +62,76 @@ app.set('io', io);
 app.use('/api', routes);
 
 // Socket.io connection handler - Simplified for real-time only
+// ... (previous imports remain the same)
+
 const configureSocketIO = () => {
   io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
+    const userId = socket.handshake.auth.userId;
 
     // Error handling
     socket.on('error', (error) => {
       console.error('Socket error:', error);
     });
-    
+
+    // Join user's personal room for conversation updates
+    if (userId) {
+      socket.join(userId);
+      console.log(`User ${userId} joined their personal room`);
+    }
+
     // Room management for chat rooms based on jobId and proposalId
     socket.on('join-chat-room', (roomId) => {
       socket.join(roomId);
-      console.log(`User ${socket.id} joined chat room ${roomId}`);
+      console.log(`User ${userId || socket.id} joined chat room ${roomId}`);
+    });
+
+    // Handle marking messages as read
+    socket.on('mark-as-read', async ({ threadId, userId }) => {
+      try {
+        // Notify other participant that messages were read
+        const thread = await MessageThread.findById(threadId);
+        if (thread) {
+          const otherParticipant = thread.participants.find(
+            p => p.toString() !== userId.toString()
+          );
+          if (otherParticipant) {
+            io.to(otherParticipant.toString()).emit('messages-read', {
+              threadId,
+              userId
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error handling mark-as-read:', error);
+      }
     });
 
     // Disconnection handling
     socket.on('disconnect', () => {
-      console.log('User disconnected:', socket.id);
+      console.log('User disconnected:', userId || socket.id);
     });
   });
+
+  // Attach io instance to app for use in controllers
+  app.set('io', io);
 };
 
-// Server startup with retry logic
 const startServer = async () => {
   try {
     console.log("Connecting to MongoDB...");
     await connectDB();
 
-    // Configure Socket.io
+    // Configure Socket.io - moved before routes to ensure io is available
     configureSocketIO();
+
+    // Routes - now io instance is available in controllers
+    app.use('/api', routes);
 
     // Start HTTP server
     httpServer.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
+      console.log(`Socket.IO server ready`);
     });
 
     // Error handling with retries
