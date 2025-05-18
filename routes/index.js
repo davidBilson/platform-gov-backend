@@ -7,6 +7,7 @@ import statusRoutes from './status.routes.js';
 import chatRoutes from './chat.routes.js';
 import contractRoutes from './contract.routes.js';
 import milestoneRoutes from './milestone.routes.js';
+import ratingRoutes from './rating.routes.js';
 
 const router = express.Router();
 
@@ -25,5 +26,7 @@ router.use('/chat', chatRoutes);
 router.use('/contract', contractRoutes);
 
 router.use('/milestone', milestoneRoutes);
+
+router.use('/rating', ratingRoutes);
 
 export default router;

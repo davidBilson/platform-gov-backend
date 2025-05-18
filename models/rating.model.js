@@ -36,17 +36,6 @@ const ratingSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
-  strengths: [{
-    type: String,
-    trim: true
-  }],
-  areasForImprovement: [{
-    type: String,
-    trim: true
-  }],
-  wouldWorkAgain: {
-    type: Boolean
-  },
   createdAt: {
     type: Date,
     default: Date.now

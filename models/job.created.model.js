@@ -27,34 +27,12 @@ const locationSchema = new mongoose.Schema({
   }
 });
 
-const milestoneSchema = new mongoose.Schema({
-  id: {
-    type: Number,
-    required: true
-  },
-  description: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  price: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  dueDate: {
-    type: Date,
-    default: null
-  }
-});
-
 const jobSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-  // Added client information fields
   clientName: {
     type: String,
     trim: true
@@ -143,15 +121,10 @@ const jobSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
-  milestones: {
-    type: [milestoneSchema],
-    default: []
-  },
   startDate: {
     type: Date,
     default: null
   },
-  // New fields for retainer payment type
   retainerAmount: {
     type: Number,
     min: 0,
@@ -169,7 +142,6 @@ const jobSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    // we are supposed to have [open, active, completed, closed]
     enum: ['open', 'active', 'closed', 'completed'],
     default: 'open'
   },

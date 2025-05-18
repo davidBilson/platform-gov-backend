@@ -18,7 +18,7 @@ const parseArrayField = (field) => {
   try {
     return JSON.parse(field);
   } catch (e) {
-    return [field]; // Return as single item array if not JSON parseable
+    return [field];
   }
 };
 
@@ -35,7 +35,6 @@ const verifyUserRole = async (userId) => {
 
 export const getAllJobs = async (req, res) => {
   try {
-    // Get all jobs without pagination or filtering
     const jobs = await Job.find()
       .sort({ createdAt: -1 })
       .populate('userId', 'name email profile'); // Populate user info
@@ -176,26 +175,7 @@ export const createJob = async (req, res) => {
     // Parse arrays if they come as strings
     const requiredSkills = parseArrayField(req.body.requiredSkills);
     const requiredCertifications = parseArrayField(req.body.requiredCertifications);
-    
-    // Parse milestones if provided
-    let milestones = [];
-    if (req.body.milestones) {
-      milestones = parseArrayField(req.body.milestones);
-      
-      // Ensure each milestone has required fields
-      for (let i = 0; i < milestones.length; i++) {
-        if (!milestones[i].id) milestones[i].id = i + 1;
-        if (!milestones[i].description || !milestones[i].price) {
-          console.log(`Milestone at position ${i} is missing required fields (description or price)`);
-          return res.status(400).json({
-            success: false,
-            message: `Milestone at position ${i} is missing required fields (description or price)`
-          });
-        }
-      }
-    }
-    
-    // Create job data object
+
     const jobData = {
       userId: toObjectId(userId),
       clientName: profile.name,
@@ -218,15 +198,14 @@ export const createJob = async (req, res) => {
       employmentType: req.body.employmentType,
       paymentType: req.body.paymentType,
       price: parseFloat(req.body.price),
-      milestones,
       status: req.body.status || 'open'
     };
     
     // Add payment type specific fields
     if (req.body.paymentType === 'retainer') {
       jobData.retainerAmount = parseFloat(req.body.retainerAmount || 0);
-      jobData.retainerFrequency = req.body.retainerFrequency || 'Week';
-      jobData.retainerDuration = parseInt(req.body.retainerDuration || 1);
+      jobData.retainerFrequency = req.body.retainerFrequency || '';
+      jobData.retainerDuration = parseInt(req.body.retainerDuration || 0);
     }
     
     // Add start date if provided
@@ -363,24 +342,6 @@ export const updateJob = async (req, res) => {
     const requiredSkills = req.body.requiredSkills ? parseArrayField(req.body.requiredSkills) : job.requiredSkills;
     const requiredCertifications = req.body.requiredCertifications ? parseArrayField(req.body.requiredCertifications) : job.requiredCertifications;
     
-    // Parse milestones if provided
-    let milestones = job.milestones;
-    if (req.body.milestones) {
-      milestones = parseArrayField(req.body.milestones);
-      
-      // Ensure each milestone has required fields
-      for (let i = 0; i < milestones.length; i++) {
-        if (!milestones[i].id) milestones[i].id = i + 1;
-        if (!milestones[i].description || !milestones[i].price) {
-          return res.status(400).json({
-            success: false,
-            message: `Milestone at position ${i} is missing required fields (description or price)`
-          });
-        }
-      }
-    }
-    
-    // Prepare update data
     const updateData = {
       location: req.body.location || job.location,
       jobCategory: req.body.jobCategory || job.jobCategory,
@@ -391,33 +352,27 @@ export const updateJob = async (req, res) => {
       employmentType: req.body.employmentType || job.employmentType,
       paymentType: req.body.paymentType || job.paymentType,
       price: req.body.price ? parseFloat(req.body.price) : job.price,
-      milestones,
       updatedAt: Date.now()
     };
     
-    // Handle boolean fields
     if (req.body.requiresRegisteredLobbyist !== undefined) {
       updateData.requiresRegisteredLobbyist = req.body.requiresRegisteredLobbyist === 'true' || req.body.requiresRegisteredLobbyist === true;
     }
     
-    // Update payment type specific fields
     if (req.body.paymentType === 'retainer' || job.paymentType === 'retainer') {
       updateData.retainerAmount = req.body.retainerAmount ? parseFloat(req.body.retainerAmount) : job.retainerAmount;
       updateData.retainerFrequency = req.body.retainerFrequency || job.retainerFrequency;
       updateData.retainerDuration = req.body.retainerDuration ? parseInt(req.body.retainerDuration) : job.retainerDuration;
     }
     
-    // Update start date if provided
     if (req.body.startDate) {
       updateData.startDate = new Date(req.body.startDate);
     }
     
-    // Update status if provided
     if (req.body.status && ['draft', 'active', 'closed', 'completed'].includes(req.body.status)) {
       updateData.status = req.body.status;
     }
     
-    // Update job
     const updatedJob = await Job.findByIdAndUpdate(
       jobObjectId,
       { $set: updateData },
@@ -437,11 +392,6 @@ export const updateJob = async (req, res) => {
   }
 };
 
-/**
- * Delete job
- * @route DELETE /api/jobs/:id
- * @access Private (own jobs only)
- */
 export const deleteJob = async (req, res) => {
   try {
     const jobId = req.params.id;
@@ -499,11 +449,6 @@ export const deleteJob = async (req, res) => {
   }
 };
 
-/**
- * Change job status
- * @route PATCH /api/jobs/:id/status
- * @access Private (own jobs only)
- */
 export const changeJobStatus = async (req, res) => {
   try {
     const jobId = req.params.id;
@@ -537,7 +482,6 @@ export const changeJobStatus = async (req, res) => {
     const jobObjectId = new mongoose.Types.ObjectId(jobId.toString());
     const userObjectId = new mongoose.Types.ObjectId(userId.toString());
     
-    // Find job
     const job = await Job.findById(jobObjectId);
     
     if (!job) {
@@ -547,7 +491,6 @@ export const changeJobStatus = async (req, res) => {
       });
     }
     
-    // Check if this job belongs to the user
     if (job.userId.toString() !== userObjectId.toString()) {
       return res.status(403).json({
         success: false,
@@ -555,7 +498,6 @@ export const changeJobStatus = async (req, res) => {
       });
     }
     
-    // Update job status
     const updatedJob = await Job.findByIdAndUpdate(
       jobObjectId,
       { 
@@ -571,216 +513,6 @@ export const changeJobStatus = async (req, res) => {
       success: true,
       data: updatedJob,
       message: `Job status changed to ${status} successfully`
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Internal server error'
-    });
-  }
-};
-
-/**
- * Add or update milestone
- * @route POST /api/jobs/:id/milestones
- * @access Private (own jobs only)
- */
-export const addOrUpdateMilestone = async (req, res) => {
-  try {
-    const jobId = req.params.id;
-    const userId = req.body.userId || req.user?.id;
-    const { id, description, price, dueDate } = req.body;
-    
-    // Validate job ID
-    if (!jobId || !isValidObjectId(jobId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid job ID'
-      });
-    }
-    
-    // Validate user ID
-    if (!userId || !isValidObjectId(userId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid user ID'
-      });
-    }
-    
-    // Validate milestone data
-    if (!description || price === undefined) {
-      return res.status(400).json({
-        success: false,
-        message: 'Milestone description and price are required'
-      });
-    }
-    
-    const jobObjectId = new mongoose.Types.ObjectId(jobId.toString());
-    const userObjectId = new mongoose.Types.ObjectId(userId.toString());
-    
-    // Find job
-    const job = await Job.findById(jobObjectId);
-    
-    if (!job) {
-      return res.status(404).json({
-        success: false,
-        message: 'Job not found'
-      });
-    }
-    
-    // Check if this job belongs to the user
-    if (job.userId.toString() !== userObjectId.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'You can only update your own jobs'
-      });
-    }
-    
-    // Check if this is fixed-price job
-    if (job.paymentType !== 'fixed-price') {
-      return res.status(400).json({
-        success: false,
-        message: 'Milestones can only be added to fixed-price jobs'
-      });
-    }
-    
-    // Create milestone object
-    const milestone = {
-      id: id || job.milestones.length + 1,
-      description,
-      price: parseFloat(price),
-      dueDate: dueDate ? new Date(dueDate) : null
-    };
-    
-    // Check if milestone with this ID already exists
-    const existingIndex = job.milestones.findIndex(m => m.id === milestone.id);
-    
-    let updatedJob;
-    
-    if (existingIndex >= 0) {
-      // Update existing milestone
-      job.milestones[existingIndex] = milestone;
-      
-      updatedJob = await Job.findByIdAndUpdate(
-        jobObjectId,
-        { 
-          $set: { 
-            milestones: job.milestones,
-            updatedAt: Date.now()
-          }
-        },
-        { new: true }
-      );
-    } else {
-      // Add new milestone
-      updatedJob = await Job.findByIdAndUpdate(
-        jobObjectId,
-        { 
-          $push: { milestones: milestone },
-          $set: { updatedAt: Date.now() }
-        },
-        { new: true }
-      );
-    }
-    
-    res.status(200).json({
-      success: true,
-      data: updatedJob,
-      message: existingIndex >= 0 ? 'Milestone updated successfully' : 'Milestone added successfully'
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Internal server error'
-    });
-  }
-};
-
-/**
- * Remove milestone
- * @route DELETE /api/jobs/:id/milestones/:milestoneId
- * @access Private (own jobs only)
- */
-
-export const removeMilestone = async (req, res) => {
-  try {
-    const jobId = req.params.id;
-    const milestoneId = parseInt(req.params.milestoneId);
-    const userId = req.body.userId || req.user?.id;
-    
-    // Validate job ID
-    if (!jobId || !isValidObjectId(jobId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid job ID'
-      });
-    }
-    
-    // Validate milestone ID
-    if (isNaN(milestoneId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid milestone ID'
-      });
-    }
-    
-    // Validate user ID
-    if (!userId || !isValidObjectId(userId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid user ID'
-      });
-    }
-    
-    const jobObjectId = new mongoose.Types.ObjectId(jobId.toString());
-    const userObjectId = new mongoose.Types.ObjectId(userId.toString());
-    
-    // Find job
-    const job = await Job.findById(jobObjectId);
-    
-    if (!job) {
-      return res.status(404).json({
-        success: false,
-        message: 'Job not found'
-      });
-    }
-    
-    // Check if this job belongs to the user
-    if (job.userId.toString() !== userObjectId.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'You can only update your own jobs'
-      });
-    }
-    
-    // Check if milestone exists
-    const milestoneIndex = job.milestones.findIndex(m => m.id === milestoneId);
-    if (milestoneIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: 'Milestone not found'
-      });
-    }
-    
-    // Remove milestone
-    job.milestones.splice(milestoneIndex, 1);
-    
-    // Update job
-    const updatedJob = await Job.findByIdAndUpdate(
-      jobObjectId,
-      { 
-        $set: { 
-          milestones: job.milestones,
-          updatedAt: Date.now()
-        }
-      },
-      { new: true }
-    );
-    
-    res.status(200).json({
-      success: true,
-      data: updatedJob,
-      message: 'Milestone removed successfully'
     });
   } catch (error) {
     res.status(500).json({

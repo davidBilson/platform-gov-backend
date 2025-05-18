@@ -8,8 +8,6 @@ import {
   updateJobStatus,
   deleteJob,
   changeJobStatus,
-  addOrUpdateMilestone,
-  removeMilestone
 } from '../controllers/job.create.controller.js';
 
 import {
@@ -54,14 +52,11 @@ router.put('/update/:id', updateJob);
 router.put('/update-job-status/:id', updateJobStatus)
 router.delete('/delete/:id', deleteJob);
 router.patch('/change-job-status/:id/status', changeJobStatus);
-router.post('/add-or-update-milestone/:id/milestones', addOrUpdateMilestone);
-router.delete('/remove-milestone/:id/milestones/:milestoneId', removeMilestone);
 
 router.post('/applications/submit', upload.single('attachment'), createJobApplication);
 router.post('/applications/save-draft', upload.single('attachment'), saveJobApplicationDraft);
 router.delete('/applications/delete-draft/:id', deleteJobApplicationDraft);
 
-// get applications received from different contractors for a particular job here you get applications by jobId
 router.get('/applications/job/:id', getApplicationsByJobId);
 
 router.get('/get-application/:id', getApplicationById);
