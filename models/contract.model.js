@@ -5,10 +5,9 @@ const contractSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Hiring',
     required: true,
-    unique: true  // This creates an index automatically
+    unique: true
   },
   
-  // Core contract information
   jobId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Jobs',
@@ -22,27 +21,23 @@ const contractSchema = new mongoose.Schema({
     ref: 'User',
   },
   
-  // Contract duration
   startDate: {
     type: Date,
     default: Date.now
   },
   endDate: Date,
   
-  // Contract status
   status: {
     type: String,
     enum: ['active', 'paused', 'completed', 'cancelled', 'disputed'],
     default: 'active'
   },
   
-  // Payment structure type (determines which tracking system to use)
   paymentStructure: {
     type: String,
     enum: ['milestone', 'timesheet', 'retainer'],
   },
   
-  // Milestone tracking system
   milestones: [{
     name: {
       type: String,
@@ -76,7 +71,6 @@ const contractSchema = new mongoose.Schema({
     }
   }],
   
-  // Timesheet tracking system
   timesheets: [{
     weekStartDate: {
       type: Date,
@@ -116,7 +110,6 @@ const contractSchema = new mongoose.Schema({
     }
   }],
   
-  // Retainer tracking system
   retainer: {
     recurringAmount: {
       type: Number,
@@ -141,7 +134,6 @@ const contractSchema = new mongoose.Schema({
     }]
   },
   
-  // Audit fields
   createdAt: {
     type: Date,
     default: Date.now
@@ -154,13 +146,11 @@ const contractSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Update hook
 contractSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   next();
 });
 
-// Validation for payment structure consistency
 contractSchema.pre('save', function(next) {
   if (this.paymentStructure === 'milestone' && (!this.milestones || this.milestones.length === 0)) {
     throw new Error('Milestone payment structure requires at least one milestone');

@@ -20,7 +20,7 @@ const hiringSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'JobApplications',
     required: true,
-    unique: true  // This creates an index automatically
+    unique: true
   },
   contractorSigned: {
     type: Boolean,
@@ -45,7 +45,7 @@ const hiringSchema = new mongoose.Schema({
       type: String,
       enum: ['hourly', 'fixed-price', 'retainer'],
       required: true,
-      default: 'hourly'
+      default: ''
     },
     employmentType: {
       type: String,
@@ -99,13 +99,11 @@ const hiringSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Document middleware
 hiringSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   next();
 });
 
-// Validation for employment type
 hiringSchema.path('offerDetails.employmentType').validate(function(value) {
   return ['one-time', 'full-time', 'part-time'].includes(value);
 }, 'Invalid employment type');

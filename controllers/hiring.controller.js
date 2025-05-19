@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { uploadFile } from '../utils/cloudinary.js';
 import Hiring from '../models/hiring.model.js';
 import path from 'path';
+import { equal } from 'assert';
 
 export const createHiringOffer = async (req, res) => {
   try {
@@ -15,13 +16,14 @@ export const createHiringOffer = async (req, res) => {
       contractorId,
       applicationId,
       rate,
+      paymentType,
       employmentType,
       startDate,
-      clientNotes = ''
+      clientNotes
     } = req.body;
 
     // Validate required fields
-    if (!jobId || !clientId || !contractorId || !applicationId || !rate || !employmentType || !startDate) {
+    if (!jobId || !clientId || !contractorId || !applicationId || !rate || !paymentType || !employmentType || !startDate) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
@@ -63,7 +65,6 @@ export const createHiringOffer = async (req, res) => {
       }
     }
 
-    // Rest of your controller logic remains the same...
     const newHiring = new Hiring({
       jobId,
       clientId,
@@ -71,12 +72,12 @@ export const createHiringOffer = async (req, res) => {
       applicationId,
       offerDetails: {
         rate: parseFloat(rate),
-        paymentType: 'hourly',
+        paymentType,
         employmentType,
         startDate: new Date(startDate)
       },
       documents: uploadedDocuments,
-      clientNotes,
+      clientNotes: req.body.clientNotes || '',
       status: 'offered'
     });
 
