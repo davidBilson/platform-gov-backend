@@ -32,12 +32,10 @@ export const createContract = async (req, res) => {
         paymentStructure = 'milestone';
         break;
       case 'hourly':
-        // paymentStructure = 'timesheet';
-        paymentStructure = 'milestone';
+        paymentStructure = 'timesheet';
         break;
       case 'retainer':
-        // paymentStructure = 'retainer';
-        paymentStructure = 'milestone';
+        paymentStructure = 'retainer';
         break;
       default:
         paymentStructure = 'milestone';
@@ -108,9 +106,9 @@ export const getSingleContract = async (req, res) => {
       clientId,
       contractorId
     })
-    .populate('jobId', 'title') // Get job title
-    .populate('clientId', 'name email profileImage') // Basic client info
-    .populate('contractorId', 'name email profileImage'); // Basic contractor info
+    .populate('jobId', 'title')
+    .populate('clientId', 'name email profileImage')
+    .populate('contractorId', 'name email profileImage');
 
     if (!contract) {
       return res.status(404).json({ 
