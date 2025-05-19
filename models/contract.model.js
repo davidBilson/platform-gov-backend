@@ -151,18 +151,18 @@ contractSchema.pre('save', function(next) {
   next();
 });
 
-contractSchema.pre('save', function(next) {
-  if (this.paymentStructure === 'milestone' && (!this.milestones || this.milestones.length === 0)) {
-    throw new Error('Milestone payment structure requires at least one milestone');
-  }
-  if (this.paymentStructure === 'timesheet' && this.timesheets && this.timesheets.some(ts => ts.hours <= 0)) {
-    throw new Error('Timesheet entries must have positive hours');
-  }
-  if (this.paymentStructure === 'retainer' && !this.retainer?.recurringAmount) {
-    throw new Error('Retainer payment structure requires a recurring amount');
-  }
-  next();
-});
+// contractSchema.pre('save', function(next) {
+//   if (this.paymentStructure === 'milestone' && (!this.milestones || this.milestones.length === 0)) {
+//     throw new Error('Milestone payment structure requires at least one milestone');
+//   }
+//   if (this.paymentStructure === 'timesheet' && this.timesheets && this.timesheets.some(ts => ts.hours <= 0)) {
+//     throw new Error('Timesheet entries must have positive hours');
+//   }
+//   if (this.paymentStructure === 'retainer' && !this.retainer?.recurringAmount) {
+//     throw new Error('Retainer payment structure requires a recurring amount');
+//   }
+//   next();
+// });
 
 const Contract = mongoose.model('Contract', contractSchema);
 export default Contract;
