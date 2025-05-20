@@ -1,5 +1,6 @@
 import Contract from '../../models/contract.model.js';
 import Hiring from '../../models/hiring.model.js';
+import ClientProfile from '../../models/profile.client.model.js';
 
 export const createContract = async (req, res) => {
   try {
@@ -127,6 +128,83 @@ export const getSingleContract = async (req, res) => {
     res.status(500).json({ 
       success: false, 
       message: 'Server error fetching contract',
+      error: error.message 
+    });
+  }
+};
+
+export const getContractorContracts = async (req, res) => {
+  try {
+    const contractorId = req.params.id;
+
+    console.log('Hit!', contractorId);
+
+    if (!contractorId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Contractor ID is required'
+      });
+    }
+
+    // First get all contracts for this contractor
+    const contracts = await Contract.find({ contractorId })
+      .populate({
+        path: 'jobId',
+        select: 'jobTitle description location employmentType paymentType retainerAmount retainerFrequency price clientName clientLogo'
+      })
+      .populate({
+        path: 'clientId',
+        select: 'name email'
+      })
+      .sort({ createdAt: -1 });
+
+    if (!contracts || contracts.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No contracts found for this contractor'
+      });
+    }
+
+    // Get a list of all unique client IDs to fetch their profiles
+    const clientIds = [...new Set(contracts.map(contract => contract.clientId?._id).filter(Boolean))];
+    
+    // Fetch all client profiles in a single query
+    const clientProfiles = await ClientProfile.find({ user: { $in: clientIds } });
+    
+    // Create a map for quick lookup
+    const profileMap = clientProfiles.reduce((map, profile) => {
+      map[profile.user.toString()] = profile;
+      return map;
+    }, {});
+
+    // Enrich the contracts with profile data
+    const enrichedContracts = contracts.map(contract => {
+      const contractObj = contract.toObject();
+      
+      if (contractObj.clientId && profileMap[contractObj.clientId._id.toString()]) {
+        contractObj.clientId.profile = profileMap[contractObj.clientId._id.toString()];
+      }
+      
+      return contractObj;
+    });
+
+    // Organize contracts by status for frontend
+    const organizedContracts = {
+      active: enrichedContracts.filter(c => c.status === 'active'),
+      inactive: enrichedContracts.filter(c => c.status === 'paused' || c.status === 'disputed'),
+      completed: enrichedContracts.filter(c => c.status === 'completed' || c.status === 'cancelled')
+    };
+
+    res.status(200).json({
+      success: true,
+      data: organizedContracts
+    });
+
+  } catch (error) {
+    console.error('Error fetching contractor contracts:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error fetching contracts',
       error: error.message 
     });
   }

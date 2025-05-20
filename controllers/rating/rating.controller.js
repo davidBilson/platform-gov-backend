@@ -1,6 +1,6 @@
-import Rating from '../models/rating.model.js';
-import Contract from '../models/contract.model.js';
-import User from '../models/user.model.js';
+import Rating from '../../models/rating.model.js';
+import Contract from '../../models/contract.model.js';
+import User from '../../models/user.model.js';
 
 // Helper function to check if user can rate
 const canRate = async (contractId, reviewerId) => {
@@ -256,6 +256,7 @@ const updateContractorRating = async (contractorId) => {
   const ratings = await Rating.find({ reviewee: contractorId, role: 'contractor' });
   
   if (ratings.length > 0) {
+    
     const totalRatings = ratings.reduce((sum, rating) => sum + rating.rating, 0);
     const averageRating = totalRatings / ratings.length;
     
@@ -263,5 +264,6 @@ const updateContractorRating = async (contractorId) => {
       averageRating: parseFloat(averageRating.toFixed(2)),
       ratingCount: ratings.length
     });
+
   }
 };

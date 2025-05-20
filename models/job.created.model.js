@@ -132,7 +132,7 @@ const jobSchema = new mongoose.Schema({
   },
   retainerFrequency: {
     type: String,
-    enum: ['Hour', 'Day', 'Week', 'Month'],
+    enum: ['weekly', 'bi-weekly', 'monthly'],
     default: 'Week'
   },
   retainerDuration: {
