@@ -1,3 +1,4 @@
+// Updated timesheet routes
 import express from 'express';
 import {
   startWorkSession,
@@ -13,7 +14,10 @@ const router = express.Router();
 
 router.post('/:contractId/sessions/start', startWorkSession);
 
-router.route('/:contractId/sessions/:sessionId/stop').put( timesheetUpload, stopWorkSession);
+router.put('/:contractId/sessions/:sessionId/stop', 
+  timesheetUpload,
+  stopWorkSession
+);
 
 router.get('/:contractId/logs', getTimesheetLogs);
 

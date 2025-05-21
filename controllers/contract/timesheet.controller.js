@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import Contract from '../../models/contract.model.js';
 import { uploadImage } from '../../utils/cloudinary.js';
 import fs from 'fs';
-
+import path from 'path';
 // Start a work session
 export const startWorkSession = async (req, res) => {
   try {
@@ -55,99 +55,6 @@ export const startWorkSession = async (req, res) => {
   }
 };
 
-export const stopWorkSession = async (req, res) => {
-  try {
-    const { contractId, sessionId } = req.params;
-    const { notes, userId } = req.body;
-    const files = req.files; // Assuming multiple files are uploaded
-
-    const contract = await Contract.findOne({
-      _id: contractId,
-      contractorId: userId,
-      paymentStructure: 'timesheet'
-    });
-
-    if (!contract) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Contract not found or invalid payment structure' 
-      });
-    }
-
-    const session = contract.timesheets.id(sessionId);
-    if (!session) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Work session not found' 
-      });
-    }
-
-    if (session.status !== 'active') {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Session is not active' 
-      });
-    }
-
-    // Upload screenshots to Cloudinary
-    const screenshotUploads = [];
-    if (files && files.length > 0) {
-      for (const file of files) {
-        try {
-          const result = await uploadImage(file.path, 'timesheets');
-          screenshotUploads.push({
-            imagePath: result.secure_url,
-            publicId: result.public_id
-          });
-          // Clean up temp file
-          fs.unlinkSync(file.path);
-        } catch (uploadError) {
-          console.error('Error uploading screenshot:', uploadError);
-          // Clean up temp file if upload failed
-          if (fs.existsSync(file.path)) {
-            fs.unlinkSync(file.path);
-          }
-        }
-      }
-    }
-
-    const endTime = new Date();
-    const startTime = new Date(session.startTime);
-    const duration = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
-
-    session.endTime = endTime;
-    session.duration = duration;
-    session.notes = notes;
-    session.screenshots = screenshotUploads;
-    session.status = 'pending';
-    await contract.save();
-
-    res.status(200).json({
-      success: true,
-      data: session,
-      message: 'Work session stopped and logged'
-    });
-
-  } catch (error) {
-    console.error('Error stopping work session:', error);
-    
-    // Clean up any remaining temp files
-    if (req.files && req.files.length > 0) {
-      req.files.forEach(file => {
-        if (fs.existsSync(file.path)) {
-          fs.unlinkSync(file.path);
-        }
-      });
-    }
-    
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error stopping work session',
-      error: error.message 
-    });
-  }
-};
-// Get timesheet logs
 export const getTimesheetLogs = async (req, res) => {
   try {
     const { contractId } = req.params;
@@ -179,12 +86,194 @@ export const getTimesheetLogs = async (req, res) => {
     });
   }
 };
+export const stopWorkSession = async (req, res) => {
+  try {
+    console.log('====== STOP WORK SESSION START ======');
+    const { contractId, sessionId } = req.params;
+    console.log('Params:', { contractId, sessionId });
+    
+    // FIXED: Access userId directly from body
+    const { notes, userId } = req.body;
+    console.log('Body:', { notes, userId });
 
-// Approve timesheet entry
+    // Enhanced file logging
+    if (!req.files || req.files.length === 0) {
+      console.log('No files received in request');
+    } else {
+      console.log(`Received ${req.files.length} files`);
+      req.files.forEach(file => {
+        console.log(`File: ${file.originalname}, Size: ${file.size}, Path: ${file.path}`);
+      });
+    }
+    
+    const files = req.files || [];
+
+    const contract = await Contract.findOne({
+      _id: contractId,
+      contractorId: userId,
+      paymentStructure: 'timesheet'
+    });
+
+    if (!contract) {
+      console.log('Contract not found');
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Contract not found or invalid payment structure' 
+      });
+    }
+
+    const session = contract.timesheets.id(sessionId);
+    if (!session) {
+      console.log('Session not found');
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Work session not found' 
+      });
+    }
+
+    if (session.status !== 'active') {
+      console.log('Session not active');
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Session is not active' 
+      });
+    }
+
+    // FIXED: Upload screenshots to Cloudinary with enhanced error handling
+    const screenshotUploads = [];
+    if (files && files.length > 0) {
+      console.log(`Processing ${files.length} screenshots`);
+      
+      for (const file of files) {
+        try {
+          console.log(`Processing file: ${file.path}`);
+          
+          // Verify file exists and is valid before attempting to upload
+          if (!fs.existsSync(file.path)) {
+            console.error(`File does not exist: ${file.path}`);
+            continue;
+          }
+          
+          // Verify file size
+          const stats = fs.statSync(file.path);
+          if (stats.size > 5 * 1024 * 1024) {
+            console.error(`File too large: ${file.path} (${stats.size} bytes)`);
+            fs.unlinkSync(file.path);
+            continue;
+          }
+
+          // Verify file type by extension
+          const fileExt = path.extname(file.originalname).toLowerCase();
+          if (!['.jpg', '.jpeg', '.png', '.gif'].includes(fileExt)) {
+            console.error(`Invalid file type: ${fileExt}`);
+            fs.unlinkSync(file.path);
+            continue;
+          }
+          
+          console.log('Uploading to Cloudinary...');
+          // FIXED: Using the correct uploadImage function from cloudinary utils
+          const result = await uploadImage(file.path, 'timesheets');
+          console.log('Upload successful:', result.secure_url);
+          
+          screenshotUploads.push({
+            imagePath: result.secure_url,
+            publicId: result.public_id,
+            uploadedAt: new Date()
+          });
+          
+          // Clean up temp file
+          try {
+            fs.unlinkSync(file.path);
+            console.log('Temp file deleted successfully');
+          } catch (cleanupError) {
+            console.error('Error cleaning up temp file:', cleanupError);
+            // Attempt to delete again after a short delay
+            await new Promise(resolve => setTimeout(resolve, 500));
+            if (fs.existsSync(file.path)) {
+              fs.unlinkSync(file.path);
+            }
+          }
+        } catch (uploadError) {
+          console.error('Error uploading screenshot:', uploadError);
+          
+          // Clean up temp file if upload failed
+          try {
+            if (fs.existsSync(file.path)) {
+              fs.unlinkSync(file.path);
+              console.log('Temp file deleted after upload failure');
+            }
+          } catch (cleanupError) {
+            console.error('Error cleaning up temp file after failed upload:', cleanupError);
+          }
+        }
+      }
+    }
+
+    console.log('Updating session in database');
+    const endTime = new Date();
+    const startTime = new Date(session.startTime);
+    const duration = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
+
+    session.endTime = endTime;
+    session.duration = duration;
+    session.notes = notes;
+    session.screenshots = screenshotUploads;
+    session.status = 'pending';
+    
+    // Add additional metadata
+    session.updatedAt = new Date();
+    session.screenshotCount = screenshotUploads.length;
+    
+    await contract.save();
+    console.log('Session updated successfully with', screenshotUploads.length, 'screenshots');
+
+    console.log('====== STOP WORK SESSION END ======');
+    res.status(200).json({
+      success: true,
+      data: session,
+      message: 'Work session stopped and logged',
+      screenshotCount: screenshotUploads.length
+    });
+
+  } catch (error) {
+    console.error('====== ERROR IN STOP WORK SESSION ======');
+    console.error(error);
+    
+    // Enhanced cleanup of any remaining temp files
+    if (req.files && Array.isArray(req.files)) {
+      console.log('Cleaning up temporary files after error');
+      for (const file of req.files) {
+        try {
+          if (fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+            console.log(`Deleted: ${file.path}`);
+          }
+        } catch (cleanupError) {
+          console.error('Error during cleanup in error handler:', cleanupError);
+        }
+      }
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error stopping work session',
+      error: error.message,
+      receivedFiles: req.files ? req.files.length : 0
+    });
+  }
+};
+
 export const approveTimesheetEntry = async (req, res) => {
   try {
     const { contractId, logId } = req.params;
-    const userId = req.user._id;
+    const userId = req.body.userId || req.query.userId;
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
 
     const contract = await Contract.findOne({
       _id: contractId,
@@ -235,12 +324,24 @@ export const approveTimesheetEntry = async (req, res) => {
   }
 };
 
-// Dispute timesheet entry
 export const disputeTimesheetEntry = async (req, res) => {
   try {
     const { contractId, logId } = req.params;
-    const { reason } = req.body;
-    const userId = req.user._id;
+    const { reason, userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+    
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        message: 'Dispute reason is required'
+      });
+    }
 
     const contract = await Contract.findOne({
       _id: contractId,

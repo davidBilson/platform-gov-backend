@@ -73,8 +73,44 @@ export const uploadFile = async (fileBuffer, folder = 'uploads', resourceType = 
   }
 };
 
+// export const uploadImage = async (filePath, folder = 'profiles') => {
+//   return uploadFile(filePath, folder, 'image');
+// };
+
+// Fix for uploadImage function in utils/cloudinary.js
 export const uploadImage = async (filePath, folder = 'profiles') => {
-  return uploadFile(filePath, folder, 'image');
+  try {
+    // Check if filePath exists and is valid
+    if (!filePath || typeof filePath !== 'string') {
+      throw new Error(`Invalid file path: ${filePath}`);
+    }
+    
+    // If file doesn't exist, throw error
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`File does not exist: ${filePath}`);
+    }
+    
+    const resourceType = 'image';
+    
+    // Upload file to Cloudinary
+    const result = await cloudinary.uploader.upload(filePath, {
+      folder,
+      resource_type: resourceType,
+      use_filename: true,
+      unique_filename: true,
+      overwrite: false
+    });
+    
+    console.log(`Successfully uploaded ${filePath} to Cloudinary`, {
+      public_id: result.public_id,
+      url: result.secure_url
+    });
+    
+    return result;
+  } catch (error) {
+    console.error(`Error uploading image to Cloudinary: ${error.message}`, error);
+    throw error;
+  }
 };
 
 

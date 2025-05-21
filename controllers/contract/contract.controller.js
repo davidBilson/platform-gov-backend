@@ -149,6 +149,10 @@ export const getContractorContracts = async (req, res) => {
     // First get all contracts for this contractor
     const contracts = await Contract.find({ contractorId })
       .populate({
+        path: 'hiringId',
+        select: 'applicationId'
+      })
+      .populate({
         path: 'jobId',
         select: 'jobTitle description location employmentType paymentType retainerAmount retainerFrequency price clientName clientLogo'
       })

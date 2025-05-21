@@ -159,8 +159,7 @@ export const getJobsByUserId = async (req, res) => {
 
 export const createJob = async (req, res) => {
   try {
-    const userId = req.body.userId || req.user?.id;
-    
+    const userId = req.body.userId;
     // Check if user exists and determine role
     const { hasValidRole, role, profile } = await verifyUserRole(userId);
 
@@ -222,6 +221,7 @@ export const createJob = async (req, res) => {
       message: 'Job created successfully'
     });
   } catch (error) {
+    console.log(error)
     res.status(500).json({
       success: false,
       message: error.message || 'Internal server error'
