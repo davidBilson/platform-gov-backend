@@ -4,7 +4,7 @@ import { startRetainer, submitWorkSummary, getRetainerDetails } from '../control
 const router = express.Router();
 
 router.put('/:id/retainer/start', startRetainer);
-router.post('/:id/retainer/submit-summary', submitWorkSummary);
-router.get('/:id/retainer', getRetainerDetails);
+router.post('/:id/retainer/summary', submitWorkSummary);
+router.post('/:id/retainer', getRetainerDetails);
 
 export default router;
