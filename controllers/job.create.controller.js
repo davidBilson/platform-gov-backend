@@ -160,7 +160,7 @@ export const getJobsByUserId = async (req, res) => {
 export const createJob = async (req, res) => {
   try {
     const userId = req.body.userId;
-    // Check if user exists and determine role
+    console.log(req.body);
     const { hasValidRole, role, profile } = await verifyUserRole(userId);
 
     if (!hasValidRole) {

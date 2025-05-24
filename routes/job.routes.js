@@ -46,7 +46,7 @@ const router = express.Router();
 
 router.get('/get-all', getAllJobs);
 router.get('/get-single/:id', getJobById);
-router.get('/get-jobs-by-user-id/user/:id', getJobsByUserId); //fetch jobs created by client
+router.get('/get-jobs-by-user-id/user/:id', getJobsByUserId);
 router.post('/create', createJob);
 router.put('/update/:id', updateJob);
 router.put('/update-job-status/:id', updateJobStatus)
