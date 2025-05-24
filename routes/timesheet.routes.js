@@ -27,8 +27,8 @@ router.put('/:contractId/logs/:logId/approve', approveTimesheetEntry);
 
 router.put('/:contractId/logs/:logId/dispute', disputeTimesheetEntry);
 
-router.post('/:contractId/logs/manual', timesheetUpload, logHoursManually);
+router.post('/log-hours-manually/:id', timesheetUpload, logHoursManually);
 
-router.put('/:contractId/max-hours', setMaxHours);
+router.put('/set-max-hours/:id', setMaxHours);
 
 export default router;

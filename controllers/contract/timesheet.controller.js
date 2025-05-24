@@ -395,20 +395,26 @@ export const disputeTimesheetEntry = async (req, res) => {
 
 export const setMaxHours = async (req, res) => {
   try {
-    const { contractId } = req.params;
+    const contractId = req.params.id;
     const { hours } = req.body;
-    const userId = req.body.userId;
 
-    if (!hours || !userId) {
+    if (!hours || isNaN(hours)) {
       return res.status(400).json({
         success: false,
-        message: 'Hours and user ID are required'
+        message: 'Valid hours value is required'
+      });
+    }
+
+    const parsedHours = parseFloat(hours);
+    if (parsedHours <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Hours must be a positive number'
       });
     }
 
     const contract = await Contract.findOne({
       _id: contractId,
-      clientId: userId,
       status: 'active'
     });
 
@@ -419,12 +425,15 @@ export const setMaxHours = async (req, res) => {
       });
     }
 
-    contract.maxHours = parseFloat(hours);
+    contract.maxHours = parsedHours;
     await contract.save();
 
     res.status(200).json({
       success: true,
-      data: contract,
+      data: {
+        maxHours: contract.maxHours,
+        contractId: contract._id
+      },
       message: 'Maximum hours set successfully'
     });
 
@@ -440,9 +449,11 @@ export const setMaxHours = async (req, res) => {
 
 export const logHoursManually = async (req, res) => {
   try {
-    const { contractId } = req.params;
+    const contractId = req.params.id;
     const { hours, description, userId } = req.body;
     const files = req.files || [];
+
+    console.log('Manual hours logging:', { contractId, hours, description, userId, fileCount: files.length });
 
     if (!hours || !userId) {
       return res.status(400).json({
@@ -450,6 +461,17 @@ export const logHoursManually = async (req, res) => {
         message: 'Hours and user ID are required'
       });
     }
+
+    const parsedHours = parseFloat(hours);
+    if (isNaN(parsedHours) || parsedHours <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Hours must be a valid positive number'
+      });
+    }
+
+    // Convert hours to seconds (this is what we expect based on frontend)
+    const durationInSeconds = Math.round(parsedHours * 3600);
 
     const contract = await Contract.findOne({
       _id: contractId,
@@ -465,16 +487,25 @@ export const logHoursManually = async (req, res) => {
       });
     }
 
-    // Check max hours if set
     if (contract.maxHours) {
-      const totalHours = contract.timesheets.reduce((total, session) => {
+      const totalExistingSeconds = contract.timesheets.reduce((total, session) => {
         return total + (session.duration || 0);
-      }, 0) / 3600;
+      }, 0);
+      
+      const totalExistingHours = totalExistingSeconds / 3600;
+      const newTotalHours = totalExistingHours + parsedHours;
 
-      if (totalHours + parseFloat(hours) > contract.maxHours) {
+      console.log('Max hours check:', {
+        maxHours: contract.maxHours,
+        existingHours: totalExistingHours,
+        newHours: parsedHours,
+        newTotal: newTotalHours
+      });
+
+      if (newTotalHours > contract.maxHours) {
         return res.status(400).json({
           success: false,
-          message: 'Logging these hours would exceed the maximum allowed hours'
+          message: `Logging these hours would exceed the maximum allowed hours. Current: ${totalExistingHours.toFixed(2)}h, Adding: ${parsedHours}h, Max: ${contract.maxHours}h`
         });
       }
     }
@@ -483,12 +514,40 @@ export const logHoursManually = async (req, res) => {
     const screenshotUploads = [];
     for (const file of files) {
       try {
+        console.log(`Processing screenshot: ${file.originalname}`);
+        
+        // Verify file exists and is valid
+        if (!fs.existsSync(file.path)) {
+          console.error(`File does not exist: ${file.path}`);
+          continue;
+        }
+        
+        // Verify file size (5MB limit)
+        const stats = fs.statSync(file.path);
+        if (stats.size > 5 * 1024 * 1024) {
+          console.error(`File too large: ${file.path} (${stats.size} bytes)`);
+          fs.unlinkSync(file.path);
+          continue;
+        }
+
+        // Verify file type
+        const fileExt = path.extname(file.originalname).toLowerCase();
+        if (!['.jpg', '.jpeg', '.png', '.gif'].includes(fileExt)) {
+          console.error(`Invalid file type: ${fileExt}`);
+          fs.unlinkSync(file.path);
+          continue;
+        }
+
         const result = await uploadImage(file.path, 'timesheets');
+        console.log('Screenshot uploaded successfully:', result.secure_url);
+        
         screenshotUploads.push({
           imagePath: result.secure_url,
           publicId: result.public_id,
           uploadedAt: new Date()
         });
+        
+        // Clean up temp file
         fs.unlinkSync(file.path);
       } catch (uploadError) {
         console.error('Error uploading screenshot:', uploadError);
@@ -498,29 +557,57 @@ export const logHoursManually = async (req, res) => {
       }
     }
 
-    // Create manual log entry
+    // Create manual log entry - FIXED: Proper time calculation
+    const now = new Date();
+    const startTime = new Date(now.getTime() - (durationInSeconds * 1000));
+    
     const manualLog = {
-      startTime: new Date(Date.now() - (hours * 3600 * 1000)),
-      endTime: new Date(),
-      duration: parseInt(hours) * 3600,
-      notes: description,
+      startTime: startTime,
+      endTime: now,
+      duration: durationInSeconds, // Store duration in seconds
+      notes: description || '',
       screenshots: screenshotUploads,
       status: 'pending',
       isManual: true,
+      createdAt: now,
       _id: new mongoose.Types.ObjectId()
     };
+
+    console.log('Creating manual log:', {
+      startTime: manualLog.startTime,
+      endTime: manualLog.endTime,
+      duration: manualLog.duration,
+      screenshotCount: screenshotUploads.length
+    });
 
     contract.timesheets.push(manualLog);
     await contract.save();
 
+    console.log('Manual hours logged successfully');
+
     res.status(201).json({
       success: true,
       data: manualLog,
-      message: 'Hours logged manually'
+      message: 'Hours logged manually',
+      screenshotCount: screenshotUploads.length
     });
 
   } catch (error) {
     console.error('Error logging hours manually:', error);
+    
+    // Clean up any remaining temp files
+    if (req.files && Array.isArray(req.files)) {
+      for (const file of req.files) {
+        try {
+          if (fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+          }
+        } catch (cleanupError) {
+          console.error('Error cleaning up temp file:', cleanupError);
+        }
+      }
+    }
+    
     res.status(500).json({
       success: false,
       message: 'Server error logging hours manually',

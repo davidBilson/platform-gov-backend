@@ -93,28 +93,42 @@ export const createContract = async (req, res) => {
 
 export const getSingleContract = async (req, res) => {
   try {
-    const { jobId, clientId, contractorId } = req.body;
+    const { jobId, clientId, contractorId, mutualContractId } = req.body;
 
-    if (!jobId || !clientId || !contractorId) {
+    const hasMutualId = mutualContractId;
+    const hasRequiredIds = jobId && clientId && contractorId;
+
+    if (!hasMutualId && !hasRequiredIds) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: jobId, clientId, or contractorId'
+        message: 'Missing required fields: either mutualContractId or (jobId, clientId, and contractorId)'
       });
     }
 
-    const contract = await Contract.findOne({
-      jobId,
-      clientId,
-      contractorId
-    })
-    .populate('jobId', 'title')
-    .populate('clientId', 'name email profileImage')
-    .populate('contractorId', 'name email profileImage');
+    let contract;
+
+    if (mutualContractId) {
+      contract = await Contract.findOne({
+        _id: mutualContractId
+      })
+      .populate('jobId', 'title')
+      .populate('clientId', 'name email profileImage')
+      .populate('contractorId', 'name email profileImage');
+    } else {
+      contract = await Contract.findOne({
+        jobId,
+        clientId,
+        contractorId
+      })
+      .populate('jobId', 'title')
+      .populate('clientId', 'name email profileImage')
+      .populate('contractorId', 'name email profileImage');
+    }
 
     if (!contract) {
       return res.status(404).json({ 
         success: false, 
-        message: 'Contract not found with the provided IDs' 
+        message: 'Contract not found with the provided parameters' 
       });
     }
 

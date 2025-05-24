@@ -28,7 +28,8 @@ const contractSchema = new mongoose.Schema({
 
   maxHours: {
     type: Number,
-    min: 1
+    min: 0,
+    default: null
   },
   
   isManual: {
