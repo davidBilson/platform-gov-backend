@@ -1,6 +1,6 @@
+import ClientProfile from '../../models/profile.client.model.js';
 import Contract from '../../models/contract.model.js';
 import Hiring from '../../models/hiring.model.js';
-import ClientProfile from '../../models/profile.client.model.js';
 
 export const createContract = async (req, res) => {
   try {
@@ -133,21 +133,20 @@ export const getSingleContract = async (req, res) => {
   }
 };
 
-export const getContractorContracts = async (req, res) => {
+export const getContracts = async (req, res) => {
   try {
-    const contractorId = req.params.id;
+    const userId = req.params.id;
 
-    console.log('Hit!', contractorId);
-
-    if (!contractorId) {
+    if (!userId) {
       return res.status(400).json({
         success: false,
-        message: 'Contractor ID is required'
+        message: 'User ID is required'
       });
     }
 
-    // First get all contracts for this contractor
-    const contracts = await Contract.find({ contractorId })
+    const contracts = await Contract.find({ 
+      $or: [{ clientId: userId }, { contractorId: userId }]
+     })
       .populate({
         path: 'hiringId',
         select: 'applicationId'
@@ -160,6 +159,10 @@ export const getContractorContracts = async (req, res) => {
         path: 'clientId',
         select: 'name email'
       })
+      .populate({
+        path: 'contractorId',
+        select: 'name email'
+      })
       .sort({ createdAt: -1 });
 
     if (!contracts || contracts.length === 0) {
@@ -169,19 +172,15 @@ export const getContractorContracts = async (req, res) => {
       });
     }
 
-    // Get a list of all unique client IDs to fetch their profiles
     const clientIds = [...new Set(contracts.map(contract => contract.clientId?._id).filter(Boolean))];
     
-    // Fetch all client profiles in a single query
     const clientProfiles = await ClientProfile.find({ user: { $in: clientIds } });
     
-    // Create a map for quick lookup
     const profileMap = clientProfiles.reduce((map, profile) => {
       map[profile.user.toString()] = profile;
       return map;
     }, {});
 
-    // Enrich the contracts with profile data
     const enrichedContracts = contracts.map(contract => {
       const contractObj = contract.toObject();
       
@@ -192,7 +191,6 @@ export const getContractorContracts = async (req, res) => {
       return contractObj;
     });
 
-    // Organize contracts by status for frontend
     const organizedContracts = {
       active: enrichedContracts.filter(c => c.status === 'active'),
       inactive: enrichedContracts.filter(c => c.status === 'paused' || c.status === 'disputed'),
@@ -210,6 +208,63 @@ export const getContractorContracts = async (req, res) => {
       success: false, 
       message: 'Server error fetching contracts',
       error: error.message 
+    });
+  }
+};
+
+export const endContract = async (req, res) => {
+  try {
+
+    const { contractId } = req.params;
+    const userId = req.body.userId;
+
+    if (!contractId || !userId){
+      TodayInstance.error('Incomplete credentials')
+      return;
+    }
+
+    const contract = await Contract.findOne({
+      _id: contractId,
+      $or: [{ clientId: userId }, { contractorId: userId }]
+    });
+
+    if (!contract) {
+      return res.status(404).json({
+        success: false,
+        message: 'Contract not found or unauthorized'
+      });
+    }
+    
+    if (contract.status === 'completed') {
+      return res.status(200).json({
+        success: false,
+        message: 'Contract already completed!'
+      });
+    }
+
+    if (contract.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only active contracts can be ended'
+      });
+    }
+
+    contract.status = 'completed';
+    contract.endDate = new Date();
+    await contract.save();
+
+    res.status(200).json({
+      success: true,
+      data: contract,
+      message: 'Contract ended successfully'
+    });
+
+  } catch (error) {
+    console.error('Error ending contract:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error ending contract',
+      error: error.message
     });
   }
 };

@@ -3,8 +3,6 @@ import {
   createRating,
   getUserRatings,
   getRatingById,
-  updateRating,
-  deleteRating,
   getContractRatings,
   getJobRatings
 } from '../controllers/rating/rating.controller.js';
@@ -19,12 +17,6 @@ router.get('/get-all-rating/user/:id', getUserRatings);
 
 // Get a specific rating by ID
 router.get('/get-rating/:id', getRatingById);
-
-// Update a rating
-router.put('/update-rating/:id', updateRating);
-
-// Delete a rating
-router.delete('/delete-rating/:id', deleteRating);
 
 // Get ratings for a contract
 router.get('/get-contract-rating/contract/:id', getContractRatings);

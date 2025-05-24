@@ -26,6 +26,16 @@ const contractSchema = new mongoose.Schema({
     default: Date.now
   },
 
+  maxHours: {
+    type: Number,
+    min: 1
+  },
+  
+  isManual: {
+    type: Boolean,
+    default: false
+  },
+
   endDate: Date,
   
   status: {
@@ -73,18 +83,16 @@ const contractSchema = new mongoose.Schema({
   }],
   
   timesheets: [{
-    // Session tracking fields
     startTime: {
       type: Date,
       required: true
     },
     endTime: Date,
-    duration: { // in seconds
+    duration: {
       type: Number,
       min: 0
     },
     
-    // Screenshot tracking
     screenshots: [{
       imagePath: {
         type: String,

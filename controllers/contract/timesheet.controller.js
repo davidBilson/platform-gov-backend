@@ -392,3 +392,139 @@ export const disputeTimesheetEntry = async (req, res) => {
     });
   }
 };
+
+export const setMaxHours = async (req, res) => {
+  try {
+    const { contractId } = req.params;
+    const { hours } = req.body;
+    const userId = req.body.userId;
+
+    if (!hours || !userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Hours and user ID are required'
+      });
+    }
+
+    const contract = await Contract.findOne({
+      _id: contractId,
+      clientId: userId,
+      status: 'active'
+    });
+
+    if (!contract) {
+      return res.status(404).json({
+        success: false,
+        message: 'Contract not found or unauthorized'
+      });
+    }
+
+    contract.maxHours = parseFloat(hours);
+    await contract.save();
+
+    res.status(200).json({
+      success: true,
+      data: contract,
+      message: 'Maximum hours set successfully'
+    });
+
+  } catch (error) {
+    console.error('Error setting max hours:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error setting max hours',
+      error: error.message
+    });
+  }
+};
+
+export const logHoursManually = async (req, res) => {
+  try {
+    const { contractId } = req.params;
+    const { hours, description, userId } = req.body;
+    const files = req.files || [];
+
+    if (!hours || !userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Hours and user ID are required'
+      });
+    }
+
+    const contract = await Contract.findOne({
+      _id: contractId,
+      contractorId: userId,
+      paymentStructure: 'timesheet',
+      status: 'active'
+    });
+
+    if (!contract) {
+      return res.status(404).json({
+        success: false,
+        message: 'Contract not found or invalid'
+      });
+    }
+
+    // Check max hours if set
+    if (contract.maxHours) {
+      const totalHours = contract.timesheets.reduce((total, session) => {
+        return total + (session.duration || 0);
+      }, 0) / 3600;
+
+      if (totalHours + parseFloat(hours) > contract.maxHours) {
+        return res.status(400).json({
+          success: false,
+          message: 'Logging these hours would exceed the maximum allowed hours'
+        });
+      }
+    }
+
+    // Upload screenshots
+    const screenshotUploads = [];
+    for (const file of files) {
+      try {
+        const result = await uploadImage(file.path, 'timesheets');
+        screenshotUploads.push({
+          imagePath: result.secure_url,
+          publicId: result.public_id,
+          uploadedAt: new Date()
+        });
+        fs.unlinkSync(file.path);
+      } catch (uploadError) {
+        console.error('Error uploading screenshot:', uploadError);
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+      }
+    }
+
+    // Create manual log entry
+    const manualLog = {
+      startTime: new Date(Date.now() - (hours * 3600 * 1000)),
+      endTime: new Date(),
+      duration: parseInt(hours) * 3600,
+      notes: description,
+      screenshots: screenshotUploads,
+      status: 'pending',
+      isManual: true,
+      _id: new mongoose.Types.ObjectId()
+    };
+
+    contract.timesheets.push(manualLog);
+    await contract.save();
+
+    res.status(201).json({
+      success: true,
+      data: manualLog,
+      message: 'Hours logged manually'
+    });
+
+  } catch (error) {
+    console.error('Error logging hours manually:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error logging hours manually',
+      error: error.message
+    });
+  }
+};

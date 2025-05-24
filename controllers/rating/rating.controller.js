@@ -2,22 +2,22 @@ import Rating from '../../models/rating.model.js';
 import Contract from '../../models/contract.model.js';
 import User from '../../models/user.model.js';
 
-// Helper function to check if user can rate
 const canRate = async (contractId, reviewerId) => {
-
   const contract = await Contract.findById(contractId);
   
   if (!contract) {
     return { canRate: false, message: 'Contract not found' };
   }
 
-  // Check if contract is completed
   if (contract.status !== 'completed') {
     return { canRate: false, message: 'Contract must be completed to rate' };
   }
 
-  // Check if user is part of the contract
-  if (![contract.clientId, contract.contractorId].includes(reviewerId)) {
+  const clientIdStr = contract.clientId?.toString();
+  const contractorIdStr = contract.contractorId?.toString();
+  const reviewerIdStr = reviewerId.toString();
+
+  if (![clientIdStr, contractorIdStr].includes(reviewerIdStr)) {
     return { canRate: false, message: 'User not part of this contract' };
   }
 
@@ -28,7 +28,6 @@ const canRate = async (contractId, reviewerId) => {
 export const createRating = async (req, res) => {
   
     try {
-    // reviewer should be userId on the frontend
     const { contractId, jobId, reviewee, reviewer, role, rating, comments } = req.body;
 
     // Validate required fields
@@ -133,93 +132,13 @@ export const getRatingById = async (req, res) => {
 
 };
 
-// Update a rating
-export const updateRating = async (req, res) => {
-  try {
-    // rating id
-    const id = req.params.id;
-    const { rating, comments, userId } = req.body;
-
-    // Find the rating
-    const existingRating = await Rating.findById(id);
-    if (!existingRating) {
-      return res.status(404).json({ message: 'Rating not found' });
-    }
-
-    // Check if the user is the reviewer
-    if (existingRating.reviewer.toString() !== userId.toString()) {
-      return res.status(403).json({ message: 'You can only update your own ratings' });
-    }
-
-    // Validate rating value
-    if (rating && (rating < 1 || rating > 5)) {
-      return res.status(400).json({ message: 'Rating must be between 1 and 5' });
-    }
-
-    // Update the rating
-    existingRating.rating = rating || existingRating.rating;
-    existingRating.comments = comments || existingRating.comments;
-
-    const updatedRating = await existingRating.save();
-
-    // Update user's average rating if reviewee is a contractor
-    if (existingRating.role === 'contractor') {
-      await updateContractorRating(existingRating.reviewee);
-    }
-
-    res.status(200).json(updatedRating);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// Delete a rating
-export const deleteRating = async (req, res) => {
-  try {
-    const id = req.params.id;
-    // get the userId from query instead
-    const { userId } = req.query;
-
-    const rating = await Rating.findById(id);
-    if (!rating) {
-      return res.status(404).json({ message: 'Rating not found' });
-    }
-
-    // Check if the user is the reviewer or an admin
-    if (rating.reviewer.toString() !== userId.toString() && req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Not authorized to delete this rating' });
-    }
-
-    await Rating.findByIdAndDelete(id);
-
-    // Update user's average rating if reviewee is a contractor
-    if (rating.role === 'contractor') {
-      await updateContractorRating(rating.reviewee);
-    }
-
-    res.status(200).json({ message: 'Rating deleted successfully' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// Get ratings for a contract
 export const getContractRatings = async (req, res) => {
   try {
     const contractId = req.params.id;
-    const { page = 1, limit = 10 } = req.query;
-
-    const options = {
-      page: parseInt(page),
-      limit: parseInt(limit),
-      sort: { createdAt: -1 },
-      populate: [
-        { path: 'reviewer', select: 'name' },
-        { path: 'reviewee', select: 'name' }
-      ]
-    };
-
-    const ratings = await Rating.paginate({ contractId }, options);
+    
+    const ratings = await Rating.find({ contractId: contractId })
+      .populate('reviewer', 'name')
+      .populate('reviewee', 'name');
 
     res.status(200).json(ratings);
   } catch (error) {

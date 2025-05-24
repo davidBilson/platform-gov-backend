@@ -49,7 +49,7 @@ const hiringSchema = new mongoose.Schema({
     },
     employmentType: {
       type: String,
-      enum: ['one-time', 'full-time', 'part-time'],
+      enum: ['Full-time', 'Part-time'],
       required: true
     },
     startDate: {
@@ -105,7 +105,7 @@ hiringSchema.pre('save', function(next) {
 });
 
 hiringSchema.path('offerDetails.employmentType').validate(function(value) {
-  return ['one-time', 'full-time', 'part-time'].includes(value);
+  return ['Full-time', 'Part-time'].includes(value);
 }, 'Invalid employment type');
 
 const Hiring = mongoose.model('Hiring', hiringSchema);

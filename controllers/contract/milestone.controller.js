@@ -86,10 +86,6 @@ export const getMilestones = async (req, res) => {
   }
 };
 
-
-
-
-
 export const completeMilestone = async (req, res) => {
   try {
     const { contractId, milestoneId } = req.params;

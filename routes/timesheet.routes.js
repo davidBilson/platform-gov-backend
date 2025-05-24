@@ -5,7 +5,9 @@ import {
   stopWorkSession,
   getTimesheetLogs,
   approveTimesheetEntry,
-  disputeTimesheetEntry
+  disputeTimesheetEntry,
+  logHoursManually,
+  setMaxHours
 } from '../controllers/contract/timesheet.controller.js';
 import { timesheetUpload } from '../middleware/multer-timesheet-upload.js';
 
@@ -24,5 +26,9 @@ router.get('/:contractId/logs', getTimesheetLogs);
 router.put('/:contractId/logs/:logId/approve', approveTimesheetEntry);
 
 router.put('/:contractId/logs/:logId/dispute', disputeTimesheetEntry);
+
+router.post('/:contractId/logs/manual', timesheetUpload, logHoursManually);
+
+router.put('/:contractId/max-hours', setMaxHours);
 
 export default router;
