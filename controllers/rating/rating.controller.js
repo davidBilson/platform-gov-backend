@@ -80,7 +80,7 @@ export const createRating = async (req, res) => {
 export const getUserRatings = async (req, res) => {
   try {
     const userId = req.params.id;
-    const { role, page = 1, limit = 10 } = req.query;
+    const { role } = req.query;
 
     const query = { reviewee: userId };
 
@@ -88,25 +88,22 @@ export const getUserRatings = async (req, res) => {
       query.role = role;
     }
 
-    const options = {
-      page: parseInt(page),
-      limit: parseInt(limit),
-      sort: { createdAt: -1 },
-      populate: [
-        { path: 'reviewer', select: 'name' },
-        { path: 'jobId', select: 'jobTitle' },
-        { path: 'contractId', select: 'status' }
-      ]
-    };
-
-    const ratings = await Rating.paginate(query, options);
+    // Use simple find() instead of paginate()
+    const ratings = await Rating.find(query)
+      .populate('reviewer', 'name')
+      .populate('jobId', 'jobTitle')
+      .populate('contractId', 'status')
+      .sort({ createdAt: -1 });
 
     res.status(200).json(ratings);
 
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error fetching user ratings:', error);
+    res.status(500).json({ 
+      success: false,
+      message: error.message 
+    });
   }
-
 };
 
 // Get rating by ID
