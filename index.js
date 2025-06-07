@@ -7,6 +7,8 @@ import routes from './routes/index.js';
 import connectDB from './config/database.js';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import bcrypt from 'bcrypt';
+import { setupNotificationWatchers } from './controllers/notification.controller.js';
 
 // Environment configuration
 dotenv.config({ path: './config/.env' });
@@ -113,9 +115,12 @@ const configureSocketIO = () => {
     });
   });
 
+  setupNotificationWatchers(io);
+  
   // Attach io instance to app for use in controllers
   app.set('io', io);
 };
+
 
 const startServer = async () => {
   try {

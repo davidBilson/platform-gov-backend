@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import twilio from '../utils/twilio.js';
 import emailService from '../utils/nodemailer.js';
 
+// ************* REGISTER USER *************
 
 export const signUp = async (req, res, next) => {
   try {
@@ -25,6 +26,7 @@ export const signUp = async (req, res, next) => {
     
     // Generate verification codes (6 digits)
     const generateSixDigitCode = () => Math.floor(100000 + Math.random() * 900000).toString();
+    
     const emailVerificationCode = generateSixDigitCode();
     const phoneVerificationCode = generateSixDigitCode();
     
@@ -281,10 +283,8 @@ export const resendPhoneVerification = async (req, res, next) => {
   }
 };
 
+// ************* SIGN IN USER *************
 
-/**
- * User sign-in controller
- */
 export const signIn = async (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -337,7 +337,9 @@ export const signIn = async (req, res, next) => {
   }
 };
 
-// Updated requestPasswordReset controller
+
+// ************* REQUEST PASSWORD RESET *************
+
 export const requestPasswordReset = async (req, res, next) => {
   try {
     const { email } = req.body;

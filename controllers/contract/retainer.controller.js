@@ -9,8 +9,6 @@ export const startRetainer = async function(req, res) {
     const contractId = req.params.id;
     const userId = req.body.userId;
 
-    console.log('retainer hit!')
-
     if (!mongoose.Types.ObjectId.isValid(contractId)) {
       return res.status(400).json({ 
         success: false, 

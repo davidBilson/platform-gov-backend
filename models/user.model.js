@@ -17,7 +17,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Please provide a password'],
     minlength: 8,
-    select: false // Don't return password in queries by default
+    select: false 
   },
   phoneNumber: {
     type: String,
@@ -27,6 +27,14 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['contractor', 'client', 'admin'],
     default: 'contractor'
+  },
+  isSuspended: {
+    type: Boolean,
+    default: false
+  },
+  isHighPriority: {
+    type: Boolean,
+    default: false
   },
   isEmailVerified: {
     type: Boolean,

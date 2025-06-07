@@ -1,10 +1,12 @@
 import express from 'express';
+import adminRoutes from './admin.routes.js';
 import authRoutes from './auth.routes.js';
 import profileRoutes from './profile.routes.js';
 import jobRoutes from './job.routes.js';
 import hiringRoutes from './hiring.routes.js';
 import statusRoutes from './status.routes.js';
 import chatRoutes from './chat.routes.js';
+import notificationRoutes from './notification.routes.js';
 import contractRoutes from './contract.routes.js';
 import milestoneRoutes from './milestone.routes.js';
 import timesheetRoutes from './timesheet.routes.js';
@@ -12,6 +14,8 @@ import retainerRoutes from './retainer.routes.js';
 import ratingRoutes from './rating.routes.js';
 
 const router = express.Router();
+
+router.use('/admin', adminRoutes);
 
 router.use('/auth', authRoutes);
 
@@ -24,6 +28,8 @@ router.use('/hiring', hiringRoutes);
 router.use('/status', statusRoutes);
 
 router.use('/chat', chatRoutes);
+
+router.use('/notifications', notificationRoutes);
 
 router.use('/contract', contractRoutes);
 
