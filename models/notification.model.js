@@ -24,6 +24,7 @@ const notificationSchema = new mongoose.Schema({
       'welcome', 
       'new_rating', 
       'new_message', 
+      'new_application',
       'application_viewed', 
       'application_active',
       'offer_received',

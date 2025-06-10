@@ -5,6 +5,7 @@ import { Message } from '../models/messaging.system.model.js';
 import Hiring from '../models/hiring.model.js';
 import Contract from '../models/contract.model.js';
 import JobApplication from '../models/job.applications.model.js';
+import Job from '../models/job.created.model.js'; // Added import for Job model
 
 // Helper to create and emit notification
 const createNotification = async (io, { userId, title, message, type, link = null }) => {
@@ -78,7 +79,6 @@ export const setupNotificationWatchers = (io) => {
     if (change.operationType === 'insert') {
       const newMessage = change.fullDocument;
       
-      // Populate sender data if needed
       await Message.populate(newMessage, { path: 'sender', select: 'name' });
       
       await createNotification(io, {
@@ -91,14 +91,51 @@ export const setupNotificationWatchers = (io) => {
     }
   });
 
-  // Watch JobApplication for status changes
+  // Watch JobApplication collection for new applications (INSERT)
   JobApplication.watch().on('change', async (change) => {
+    if (change.operationType === 'insert') {
+      const newApplication = change.fullDocument;
+      
+      // Skip notifications for draft applications
+      if (newApplication.status === 'draft') {
+        return;
+      }
+      
+      try {
+        // Populate the job details and freelancer data
+        await JobApplication.populate(newApplication, [
+          { path: 'jobId', select: 'jobTitle userId' },
+          { path: 'freelancerId', select: 'name' }
+        ]);
+        
+        // Get the client ID from the job's userId field
+        const clientId = newApplication.jobId?.userId;
+        
+        if (clientId) {
+          await createNotification(io, {
+            userId: clientId,
+            title: 'New Job Application',
+            message: `${newApplication.freelancerId?.name || 'A freelancer'} applied for your job "${newApplication.jobId?.jobTitle || 'your job'}"`,
+            type: 'new_application',
+            link: `/jobs/${newApplication.jobId?._id}/applications`
+          });
+        }
+      } catch (error) {
+        console.error('Error processing new job application notification:', error);
+      }
+    }
+  });
+
+  // Watch JobApplication collection for status updates
+  JobApplication.watch([], { fullDocument: 'updateLookup' }).on('change', async (change) => {
     if (change.operationType === 'update' && change.updateDescription?.updatedFields?.status) {
-      const updatedApp = change.fullDocument;
+      const updatedApp = change.fullDocument; // Now this will have the full document
       const status = change.updateDescription.updatedFields.status;
       
-      // Populate job data if needed
+      // Populate the jobId field
       await JobApplication.populate(updatedApp, { path: 'jobId', select: 'jobTitle' });
+      
+      console.log('Updated application:', updatedApp);
       
       if (status === 'viewed') {
         await createNotification(io, {

@@ -138,6 +138,10 @@ const jobSchema = new mongoose.Schema({
     min: 1,
     default: 1
   },
+  isPaymentVerified: {
+    type: Boolean,
+    default: false,
+  },
   status: {
     type: String,
     enum: ['open', 'active', 'closed', 'completed'],

@@ -191,7 +191,6 @@ jobApplicationSchema.pre('save', function(next) {
   next();
 });
 
-// Validate required fields before submitting a non-draft application
 jobApplicationSchema.pre('save', function(next) {
   if (this.status !== 'draft') {
     if (!this.coverLetter) {
