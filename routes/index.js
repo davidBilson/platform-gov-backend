@@ -1,5 +1,6 @@
 import express from 'express';
 import adminRoutes from './admin.routes.js';
+import contentRoutes from './content.routes.js';
 import authRoutes from './auth.routes.js';
 import profileRoutes from './profile.routes.js';
 import jobRoutes from './job.routes.js';
@@ -16,6 +17,8 @@ import ratingRoutes from './rating.routes.js';
 const router = express.Router();
 
 router.use('/admin', adminRoutes);
+
+router.use('/content', contentRoutes);
 
 router.use('/auth', authRoutes);
 

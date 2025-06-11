@@ -93,7 +93,6 @@ export const createItem = async (req, res) => {
   try {
     const { categoryId, value } = req.body;
     
-    // Check if category exists
     const category = await ContentCategory.findById(categoryId);
     if (!category) {
       return res.status(404).json({ 
@@ -125,7 +124,6 @@ export const createItem = async (req, res) => {
   }
 };
 
-// Delete item from category
 export const deleteItem = async (req, res) => {
   try {
     const { id } = req.params;
@@ -150,7 +148,6 @@ export const deleteItem = async (req, res) => {
   }
 };
 
-// Get all items in category
 export const getItemsByCategory = async (req, res) => {
   try {
     const categoryId = req.params.id;

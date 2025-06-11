@@ -1,7 +1,8 @@
 import express from 'express';
 import { 
     signUp, 
-    signIn, 
+    signIn,
+    getUserSuspendedStatus,
     verifyEmail, 
     sendPhoneVerificationCode,
     verifyPhone,
@@ -17,6 +18,8 @@ const router = express.Router();
 router.post('/sign-up', signUp);
 
 router.post('/sign-in', signIn);
+
+router.get('/check-user-suspended/:id', getUserSuspendedStatus);
 
 router.post('/verify-email', verifyEmail);
 

@@ -28,7 +28,7 @@ import {
   deleteItem,
   getItemsByCategory,
   getContentStats
-} from '../controllers/admin/content.controller.js';
+} from '../controllers/admin/admin-content.controller.js';
 
 import { 
   getContractStats,

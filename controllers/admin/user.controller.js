@@ -4,8 +4,9 @@ import User from '../../models/user.model.js';
 export const validateAdmin = async (req, res, next) => {
     try {
       const { adminId } = req.method === 'GET' || req.method === 'PUT' || req.method === 'DELETE' ? req.query || req.body : req.body;
-  
+
       if (!adminId) {
+        console.log('Admin ID is required')
         return res.status(400).json({
           success: false,
           message: 'Admin ID is required'
@@ -114,7 +115,7 @@ export const getUserStats = async (req, res) => {
         success: true,
         message: 'Admin stats retrieved successfully',
         data: {
-          totalUsers,
+          totalUsers: totalUsers - 1,
           usersByRole: {
             contractors,
             clients,

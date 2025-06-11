@@ -18,7 +18,7 @@ const parseArrayField = (field) => {
   try {
     return JSON.parse(field);
   } catch (e) {
-    return [field]; // Return as single item array if not JSON parseable
+    return [field];
   }
 };
 
@@ -30,18 +30,18 @@ export const getAllContractorProfiles = async (req, res) => {
     const enhancedProfiles = [];
     
     for (const profile of profiles) {
-      // Get user details using the user ID from the profile
-      const user = await User.findById(profile.user).select('name email phoneNumber');
+      const user = await User.findById(profile.user).select('name email phoneNumber isSuspended isHighPriority');
       
       if (user) {
-        // Combine profile data with user data
         const enhancedProfile = {
           ...profile.toObject(),
           user: {
             _id: user._id,
             name: user.name,
             email: user.email,
-            phoneNumber: user.phoneNumber
+            phoneNumber: user.phoneNumber,
+            isSuspended: user.isSuspended,
+            isHighPriority: user.isHighPriority
           }
         };
         
@@ -79,7 +79,7 @@ export const getContractorProfile = async (req, res) => {
     let profile = await ContractorProfile.findOne({ user: userId })
       .populate({
         path: 'user',
-        select: 'name'
+        select: 'name isHighPriority isSuspended'
       });
     
     if (!profile) {
@@ -87,7 +87,7 @@ export const getContractorProfile = async (req, res) => {
       profile = await ContractorProfile.findOne({ user: objectId })
         .populate({
           path: 'user',
-          select: 'name'
+          select: 'name isHighPriority isSuspended'
         });
     }
     

@@ -38,7 +38,7 @@ export const signUp = async (req, res, next) => {
       password: hashedPassword,
       emailVerificationCode,
       phoneVerificationCode,
-      role: role || 'contractor' // Use provided role or default to contractor
+      role: role || 'contractor'
     });
     
     // Prepare user data for response
@@ -47,11 +47,9 @@ export const signUp = async (req, res, next) => {
     delete userData.emailVerificationCode;
     delete userData.phoneVerificationCode;
     
-    // Send email verification code
     try {
       await emailService.sendVerificationCode(newUser.email, emailVerificationCode);
       
-      // Only send one response after everything is done
       return res.status(201).json({
         status: 'success',
         message: 'User registered successfully. Please verify your email.',
@@ -65,8 +63,6 @@ export const signUp = async (req, res, next) => {
       });
     } catch (emailError) {
       console.error('Error sending email:', emailError);
-      // If email fails, the user was created but we couldn't send verification
-      // We should still return the user ID so the frontend can handle verification
       return res.status(201).json({ 
         status: 'partial_success',
         message: 'Account created but verification email could not be sent. Please request a new code.',
@@ -459,3 +455,27 @@ export const verifyResetToken = async (req, res, next) => {
     next(error);
   }
 };
+
+export const getUserSuspendedStatus = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    
+    const user = await User.findById(id);
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    res.status(200).json({
+      status: 'success',
+      message: 'User suspended status retrieved successfully',
+      data: {
+        isSuspended: user.isSuspended
+      }
+    });
+    
+  } catch (error) {
+    console.error('Get user suspended status error:', error);
+    next(error);
+  }
+}
