@@ -47,7 +47,7 @@ import {
 
 const router = express.Router();
 
-router.use(validateAdmin);
+// router.use(validateAdmin);
 
 router.get('/get-all-users', getAllUsers);
 router.get('/get-user-stats', getUserStats);
