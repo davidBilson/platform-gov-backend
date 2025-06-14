@@ -1,5 +1,6 @@
 import express from 'express';
 import adminRoutes from './admin.routes.js';
+import paymentRoutes from './payment.routes.js';
 import contentRoutes from './content.routes.js';
 import authRoutes from './auth.routes.js';
 import profileRoutes from './profile.routes.js';
@@ -17,6 +18,8 @@ import ratingRoutes from './rating.routes.js';
 const router = express.Router();
 
 router.use('/admin', adminRoutes);
+
+router.use('/payment', paymentRoutes);
 
 router.use('/content', contentRoutes);
 

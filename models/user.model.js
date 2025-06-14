@@ -44,6 +44,11 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  
+  stripeCustomerId: String,
+  stripeAccountId: String,
+  defaultPaymentMethod: String,
+
   emailVerificationCode: String,
   phoneVerificationCode: String,
   resetToken: String,
@@ -59,7 +64,7 @@ const userSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
-
+ 
 // Document middleware: runs before .save() and .create()
 userSchema.pre('save', function(next) {
   this.updatedAt = Date.now();

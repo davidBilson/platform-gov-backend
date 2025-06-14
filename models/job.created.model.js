@@ -142,6 +142,19 @@ const jobSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  isFunded: {
+    type: Boolean,
+    default: false
+  },
+  isCompleted: {
+    type: Boolean,
+    default: false
+  },
+  isPaidOut: {
+    type: Boolean,
+    default: false
+  },
+  paymentIntentId: String,
   status: {
     type: String,
     enum: ['open', 'active', 'closed', 'completed'],
