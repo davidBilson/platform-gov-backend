@@ -5,7 +5,6 @@ import { Message } from '../models/messaging.system.model.js';
 import Hiring from '../models/hiring.model.js';
 import Contract from '../models/contract.model.js';
 import JobApplication from '../models/job.applications.model.js';
-import Job from '../models/job.created.model.js'; // Added import for Job model
 
 // Helper to create and emit notification
 const createNotification = async (io, { userId, title, message, type, link = null }) => {
@@ -27,8 +26,6 @@ const createNotification = async (io, { userId, title, message, type, link = nul
       createdAt: savedNotification.createdAt
     });
     
-    console.log(`Notification emitted to user ${userId}:`, savedNotification.title);
-    
     return savedNotification;
   } catch (error) {
     console.error('Error creating notification:', error);
@@ -38,13 +35,11 @@ const createNotification = async (io, { userId, title, message, type, link = nul
 
 // Watch for relevant events and emit notifications
 export const setupNotificationWatchers = (io) => {
-  console.log('Setting up notification watchers...');
   
   // Watch User collection for new users
   User.watch().on('change', async (change) => {
     if (change.operationType === 'insert') {
       const newUser = change.fullDocument;
-      console.log('New user registered:', newUser._id);
       
       await createNotification(io, {
         userId: newUser._id,
@@ -134,8 +129,6 @@ export const setupNotificationWatchers = (io) => {
       
       // Populate the jobId field
       await JobApplication.populate(updatedApp, { path: 'jobId', select: 'jobTitle' });
-      
-      console.log('Updated application:', updatedApp);
       
       if (status === 'viewed') {
         await createNotification(io, {
@@ -260,7 +253,6 @@ export const setupNotificationWatchers = (io) => {
 export const getNotifications = async (req, res) => {
   try {
     const userId = req.params.id;
-    console.log('Fetching notifications for user:', userId);
     const notifications = await Notification.find({ userId })
       .sort({ createdAt: -1 })
       .limit(50); // Limit to prevent large responses

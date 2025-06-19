@@ -33,6 +33,10 @@ const jobSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  fund: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Fund'
+  },
   clientName: {
     type: String,
     trim: true

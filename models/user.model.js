@@ -13,6 +13,10 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     trim: true
   },
+  escrowAccount: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'EscrowAccount'
+  },
   password: {
     type: String,
     required: [true, 'Please provide a password'],
@@ -48,6 +52,14 @@ const userSchema = new mongoose.Schema({
   stripeCustomerId: String,
   stripeAccountId: String,
   defaultPaymentMethod: String,
+  bankAccounts: [{
+    id: String,
+    last4: String,
+    bankName: String,
+    country: String,
+    currency: String,
+    default: Boolean
+  }],
 
   emailVerificationCode: String,
   phoneVerificationCode: String,
@@ -65,7 +77,6 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
  
-// Document middleware: runs before .save() and .create()
 userSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   next();

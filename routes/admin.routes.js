@@ -1,4 +1,3 @@
-// admin.routes.js
 import express from 'express';
 
 import { 
@@ -11,43 +10,15 @@ import {
   getUserProfile
 } from '../controllers/admin/user.controller.js';
 
-import { 
-  getAllJobApplications, 
-  getAllJobs, 
-  getApplicationsByFreelancer, 
-  getJobApplicationStats, 
-  getJobStats, 
-  getJobWithApplications 
-} from '../controllers/admin/job.controller.js';
-
-import { 
-  createCategory,
-  deleteCategory,
-  getAllCategories,
-  createItem,
-  deleteItem,
-  getItemsByCategory,
-  getContentStats
-} from '../controllers/admin/admin-content.controller.js';
-
-import { 
-  getContractStats,
-  getAllContracts
-} from '../controllers/admin/contract.controller.js';
-
-import { 
-  getFeeSettings, 
-  updateFeeSettings 
-} from '../controllers/admin/fee.settings.controller.js';
-
-import { 
-  getDashboardData 
-} from '../controllers/admin/dashboard.controller.js';
-
+import { getAllJobApplications, getAllJobs, getApplicationsByFreelancer, getJobApplicationStats, getJobStats, getJobWithApplications } from '../controllers/admin/job.controller.js';
+import { createCategory, deleteCategory, getAllCategories, createItem, deleteItem, getItemsByCategory, getContentStats } from '../controllers/admin/admin-content.controller.js';
+import { getContractStats, getAllContracts } from '../controllers/admin/contract.controller.js';
+import { getFeeSettings, updateFeeSettings } from '../controllers/admin/fee.settings.controller.js';
+import { getDashboardData } from '../controllers/admin/dashboard.controller.js';
 
 const router = express.Router();
 
-// router.use(validateAdmin);
+router.use(validateAdmin);
 
 router.get('/get-all-users', getAllUsers);
 router.get('/get-user-stats', getUserStats);
@@ -55,7 +26,6 @@ router.put('/toggle-priority/:id', toggleUserPriority);
 router.put('/toggle-suspend/:id', toggleUserSuspend);
 router.delete('/delete-user/:id', deleteUser);
 router.get('/user-profile/:id', getUserProfile);
-
 
 router.get('/get-all-jobs', getAllJobs);
 router.get('/get-job-stats', getJobStats);

@@ -1,3 +1,5 @@
+// transaction history
+
 import mongoose from 'mongoose';
 
 const TransactionSchema = new mongoose.Schema({
@@ -8,8 +10,7 @@ const TransactionSchema = new mongoose.Schema({
   },
   jobId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Job',
-    required: true
+    ref: 'Jobs',
   },
   type: {
     type: String,
@@ -32,7 +33,7 @@ const TransactionSchema = new mongoose.Schema({
   },
   netAmount: {
     type: Number,
-    required: true
+    default: 0
   },
   currency: {
     type: String,
@@ -77,6 +78,6 @@ TransactionSchema.pre('save', function(next) {
   next();
 });
 
-const Transaction = mongoose.model('Transaction', TransactionSchema);
+const Transaction = mongoose.model('Transactions', TransactionSchema);
 
 export default Transaction;

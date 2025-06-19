@@ -5,13 +5,13 @@ const platformFeesSchema = new mongoose.Schema({
     type: Number,
     required: true,
     min: 0,
-    max: 50 // 50% max fee
+    max: 10
   },
   clientServiceFee: {
     type: Number,
     required: true,
     min: 0,
-    max: 50 // 50% max fee
+    max: 10
   },
   minimumWithdrawal: {
     type: Number,
@@ -21,7 +21,7 @@ const platformFeesSchema = new mongoose.Schema({
   payoutDelay: {
     type: Number,
     min: 0,
-    max: 30 // 30 days max delay
+    max: 10
   },
   createdAt: {
     type: Date,
@@ -35,7 +35,6 @@ const platformFeesSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Create a single document for global settings
 platformFeesSchema.statics.getSettings = function() {
   return this.findOneAndUpdate(
     {}, 

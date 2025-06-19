@@ -128,7 +128,7 @@ export const createJobApplication = async (req, res) => {
     }
 
     // Check if job is still active
-    if (job.status !== 'open') {
+    if (job.status !== 'open' && job.status !== 'active') {
       return res.status(400).json({ success: false, message: 'This job is no longer accepting applications' });
     }
 
