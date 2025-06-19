@@ -1,6 +1,8 @@
+import dotenv from 'dotenv';
+dotenv.config({ path: './config/.env' });
+
 import cors from 'cors';
 import express from 'express';
-import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import routes from './routes/index.js';
@@ -8,8 +10,6 @@ import connectDB from './config/database.js';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { setupNotificationWatchers } from './controllers/notification.controller.js';
-
-dotenv.config({ path: './config/.env' });
 
 const app = express();
 const PORT = process.env.PORT;

@@ -7,7 +7,7 @@ import PlatformFees from '../../models/platform.fees.model.js';
 import Stripe from 'stripe';
 import { createEscrowForFundedProject } from './escrow.controller.js';
 
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || 'sk_test_51RZUzrQpiUcmNrzkun1iqWcxZjk6cZXYc5AtPPznpa9D8vNxzLTVZp836xHyzCnbt7Jl7Qes97bv0TlXMnAO29mU00fuaY1StL';
+const STRIPE_SECRET_KEY = process?.env?.STRIPE_SECRET_KEY || 'sk_test_51RZUzrQpiUcmNrzkun1iqWcxZjk6cZXYc5AtPPznpa9D8vNxzLTVZp836xHyzCnbt7Jl7Qes97bv0TlXMnAO29mU00fuaY1StL';
 
 if (!STRIPE_SECRET_KEY) {
   console.error('STRIPE_SECRET_KEY is not defined in environment variables');
