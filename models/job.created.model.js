@@ -150,6 +150,10 @@ const jobSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  paymentStatus: {
+    type: String,
+    enum: ['funded', 'pending_approval', 'completed'],
+  },
   isCompleted: {
     type: Boolean,
     default: false

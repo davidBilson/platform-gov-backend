@@ -1,5 +1,8 @@
 // admin.controller.js
 import { Fund, EscrowAccount, AdminAction } from '../../models/escrow.model.js';
+import Payment from '../../models/payment.model.js'
+
+import stripe from 'stripe';
 
 // Admin updates fund status
 export const updateFundStatus = async (req, res) => {
@@ -102,4 +105,21 @@ export const manageEscrow = async (req, res) => {
       error: error.message 
     });
   }
+};
+
+export const approvePayment = async (req, res) => {
+  const payment = await Payment.findById(req.params.paymentId);
+  
+  // Transfer funds using Stripe
+  const transfer = await stripe.transfers.create({
+    amount: payment.amount * 100,
+    currency: 'usd',
+    destination: payment.contractorStripeAccountId,
+  });
+
+  // Update payment status to 'completed'
+  payment.status = 'completed';
+  await payment.save();
+  
+  res.json({ success: true });
 };

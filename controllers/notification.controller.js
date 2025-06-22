@@ -6,7 +6,6 @@ import Hiring from '../models/hiring.model.js';
 import Contract from '../models/contract.model.js';
 import JobApplication from '../models/job.applications.model.js';
 
-// Helper to create and emit notification
 const createNotification = async (io, { userId, title, message, type, link = null }) => {
   try {
     const notification = new Notification({
@@ -18,14 +17,16 @@ const createNotification = async (io, { userId, title, message, type, link = nul
     });
     
     const savedNotification = await notification.save();
-    
-    // Emit to user's personal room with the actual saved notification
-    io.to(userId.toString()).emit('new-notification', {
+    const notificationData = {
       ...savedNotification.toObject(),
-      id: savedNotification._id.toString(), // Ensure ID is available
+      id: savedNotification._id.toString(),
       createdAt: savedNotification.createdAt
-    });
+    };
     
+    // Emit to user's personal room
+    io.to(userId.toString()).emit('new-notification', notificationData);
+    
+    console.log(`Notification sent to user ${userId}:`, notificationData.title);
     return savedNotification;
   } catch (error) {
     console.error('Error creating notification:', error);
@@ -33,198 +34,278 @@ const createNotification = async (io, { userId, title, message, type, link = nul
   }
 };
 
-// Watch for relevant events and emit notifications
+let activeWatchers = new Set();
+
 export const setupNotificationWatchers = (io) => {
+  // Prevent duplicate watchers
+  if (activeWatchers.size > 0) {
+    console.log('Notification watchers already active');
+    return;
+  }
+
+  console.log('Setting up notification watchers...');
   
   // Watch User collection for new users
-  User.watch().on('change', async (change) => {
+  const userWatcher = User.watch([], { 
+    fullDocument: 'updateLookup',
+    fullDocumentBeforeChange: 'whenAvailable'
+  });
+  
+  userWatcher.on('change', async (change) => {
     if (change.operationType === 'insert') {
       const newUser = change.fullDocument;
       
-      await createNotification(io, {
-        userId: newUser._id,
-        title: 'Welcome to GovLink!',
-        message: 'Thank you for joining our platform. Get started by completing your profile.',
-        type: 'welcome',
-        link: '/profile'
-      });
+      try {
+        await createNotification(io, {
+          userId: newUser._id,
+          title: 'Welcome to GovLink!',
+          message: 'Thank you for joining our platform. Get started by completing your profile.',
+          type: 'welcome',
+          link: '/profile'
+        });
+      } catch (error) {
+        console.error('Error processing welcome notification:', error);
+      }
     }
   });
+  activeWatchers.add('user');
 
-  // Watch Rating collection for new ratings
-  Rating.watch().on('change', async (change) => {
+  // Watch Rating collection - REMOVED $lookup, fetch data separately
+  const ratingWatcher = Rating.watch([
+    {
+      $match: {
+        operationType: 'insert'
+      }
+    }
+  ], { fullDocument: 'updateLookup' });
+
+  ratingWatcher.on('change', async (change) => {
     if (change.operationType === 'insert') {
       const newRating = change.fullDocument;
       
-      // Populate reviewer data if needed
-      await Rating.populate(newRating, { path: 'reviewer', select: 'name' });
-      
-      await createNotification(io, {
-        userId: newRating.reviewee,
-        title: 'New Rating Received',
-        message: `You received a ${newRating.rating}-star rating from ${newRating.reviewer?.name || 'a user'}`,
-        type: 'new_rating',
-        link: `/profile/${newRating.reviewee}/ratings`
-      });
+      try {
+        // Fetch reviewer data separately
+        const reviewer = await User.findById(newRating.reviewer).select('name');
+        const reviewerName = reviewer?.name || 'a user';
+        
+        await createNotification(io, {
+          userId: newRating.reviewee,
+          title: 'New Rating Received',
+          message: `You received a ${newRating.rating}-star rating from ${reviewerName}`,
+          type: 'new_rating',
+          link: `/profile/${newRating.reviewee}/ratings`
+        });
+      } catch (error) {
+        console.error('Error processing rating notification:', error);
+      }
     }
   });
+  activeWatchers.add('rating');
 
-  // Watch Message collection for new messages
-  Message.watch().on('change', async (change) => {
+  // Watch Message collection - REMOVED $lookup, fetch data separately
+  const messageWatcher = Message.watch([
+    {
+      $match: {
+        operationType: 'insert'
+      }
+    }
+  ], { fullDocument: 'updateLookup' });
+
+  messageWatcher.on('change', async (change) => {
     if (change.operationType === 'insert') {
       const newMessage = change.fullDocument;
       
-      await Message.populate(newMessage, { path: 'sender', select: 'name' });
-      
-      await createNotification(io, {
-        userId: newMessage.recipient,
-        title: 'New Message',
-        message: `You have a new message from ${newMessage.sender?.name || 'a user'}`,
-        type: 'new_message',
-        link: `/messages/${newMessage.threadId}`
-      });
+      try {
+        // Fetch sender data separately
+        const sender = await User.findById(newMessage.sender).select('name');
+        const senderName = sender?.name || 'a user';
+        
+        await createNotification(io, {
+          userId: newMessage.recipient,
+          title: 'New Message',
+          message: `You have a new message from ${senderName}`,
+          type: 'new_message',
+          link: `/messages`
+        });
+      } catch (error) {
+        console.error('Error processing message notification:', error);
+      }
     }
   });
+  activeWatchers.add('message');
 
-  // Watch JobApplication collection for new applications (INSERT)
-  JobApplication.watch().on('change', async (change) => {
-    if (change.operationType === 'insert') {
-      const newApplication = change.fullDocument;
-      
-      // Skip notifications for draft applications
-      if (newApplication.status === 'draft') {
-        return;
+  const jobApplicationWatcher = JobApplication.watch([
+    {
+      $match: {
+        $or: [
+          { operationType: 'insert' },
+          { 
+            operationType: 'update',
+            'updateDescription.updatedFields.status': { $exists: true }
+          }
+        ]
       }
-      
-      try {
-        // Populate the job details and freelancer data
-        await JobApplication.populate(newApplication, [
-          { path: 'jobId', select: 'jobTitle userId' },
-          { path: 'freelancerId', select: 'name' }
+    }
+  ], { fullDocument: 'updateLookup' });
+
+  jobApplicationWatcher.on('change', async (change) => {
+    try {
+      const application = change.fullDocument;
+
+      if (change.operationType === 'insert') {
+        // Skip draft applications
+        if (application.status === 'draft') return;
+        
+        // Fetch related data separately
+        const [jobData, freelancerData] = await Promise.all([
+          Job.findById(application.jobId).select('jobTitle userId'),
+          User.findById(application.freelancerId).select('name')
         ]);
-        
-        // Get the client ID from the job's userId field
-        const clientId = newApplication.jobId?.userId;
-        
+
+        const clientId = jobData?.userId;
         if (clientId) {
           await createNotification(io, {
             userId: clientId,
             title: 'New Job Application',
-            message: `${newApplication.freelancerId?.name || 'A freelancer'} applied for your job "${newApplication.jobId?.jobTitle || 'your job'}"`,
+            message: `${freelancerData?.name || 'A freelancer'} applied for your job "${jobData?.jobTitle || 'your job'}"`,
             type: 'new_application',
-            link: `/jobs/${newApplication.jobId?._id}/applications`
+            link: `/jobs/${jobData?._id}/applications`
           });
         }
-      } catch (error) {
-        console.error('Error processing new job application notification:', error);
       }
+
+      if (change.operationType === 'update') {
+        const status = change.updateDescription?.updatedFields?.status;
+        
+        if (status === 'viewed' || status === 'active') {
+          // Fetch job data separately
+          const jobData = await Job.findById(application.jobId).select('jobTitle');
+          
+          if (status === 'viewed') {
+            await createNotification(io, {
+              userId: application.freelancerId,
+              title: 'Application Viewed',
+              message: `Your application for job "${jobData?.jobTitle || 'a job'}" was viewed by the client`,
+              type: 'application_viewed',
+              link: `/jobs/${jobData?._id}`
+            });
+          }
+          
+          if (status === 'active') {
+            await createNotification(io, {
+              userId: application.freelancerId,
+              title: 'Application Active',
+              message: `Your application for job "${jobData?.jobTitle || 'a job'}" is now active`,
+              type: 'application_active',
+              link: `/jobs/${jobData?._id}`
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error processing job application notification:', error);
     }
   });
+  activeWatchers.add('jobapplication');
 
-  // Watch JobApplication collection for status updates
-  JobApplication.watch([], { fullDocument: 'updateLookup' }).on('change', async (change) => {
-    if (change.operationType === 'update' && change.updateDescription?.updatedFields?.status) {
-      const updatedApp = change.fullDocument; // Now this will have the full document
-      const status = change.updateDescription.updatedFields.status;
-      
-      // Populate the jobId field
-      await JobApplication.populate(updatedApp, { path: 'jobId', select: 'jobTitle' });
-      
-      if (status === 'viewed') {
+  // Watch Hiring - REMOVED $lookup, fetch data separately
+  const hiringWatcher = Hiring.watch([
+    {
+      $match: {
+        $or: [
+          { operationType: 'insert' },
+          { 
+            operationType: 'update',
+            'updateDescription.updatedFields.status': { $exists: true }
+          }
+        ]
+      }
+    }
+  ], { fullDocument: 'updateLookup' });
+
+  hiringWatcher.on('change', async (change) => {
+    try {
+      const hiring = change.fullDocument;
+
+      if (change.operationType === 'insert') {
+        // Fetch client data separately
+        const clientData = await User.findById(hiring.clientId).select('name');
+        
         await createNotification(io, {
-          userId: updatedApp.freelancerId,
-          title: 'Application Viewed',
-          message: `Your application for job "${updatedApp.jobId?.jobTitle || 'a job'}" was viewed by the client`,
-          type: 'application_viewed',
-          link: `/jobs/${updatedApp.jobId?._id}`
+          userId: hiring.contractorId,
+          title: 'New Offer Received',
+          message: `You have a new job offer from ${clientData?.name || 'a client'}`,
+          type: 'offer_received',
+          link: `/contracts/${hiring._id}`
         });
       }
       
-      if (status === 'active') {
-        await createNotification(io, {
-          userId: updatedApp.freelancerId,
-          title: 'Application Active',
-          message: `Your application for job "${updatedApp.jobId?.jobTitle || 'a job'}" is now active`,
-          type: 'application_active',
-          link: `/jobs/${updatedApp.jobId?._id}`
-        });
+      if (change.operationType === 'update') {
+        const status = change.updateDescription?.updatedFields?.status;
+        
+        if (status === 'accepted' || status === 'declined') {
+          // Fetch contractor data separately
+          const contractorData = await User.findById(hiring.contractorId).select('name');
+          
+          if (status === 'accepted') {
+            await createNotification(io, {
+              userId: hiring.clientId,
+              title: 'Offer Accepted',
+              message: `Your offer to ${contractorData?.name || 'a contractor'} was accepted`,
+              type: 'offer_accepted',
+              link: `/contracts/${hiring._id}`
+            });
+          }
+          
+          if (status === 'declined') {
+            await createNotification(io, {
+              userId: hiring.clientId,
+              title: 'Offer Declined',
+              message: `Your offer to ${contractorData?.name || 'a contractor'} was declined`,
+              type: 'offer_declined',
+              link: `/contracts/${hiring._id}`
+            });
+          }
+        }
       }
+    } catch (error) {
+      console.error('Error processing hiring notification:', error);
     }
   });
+  activeWatchers.add('hiring');
 
-  // Watch Hiring for status changes
-  Hiring.watch().on('change', async (change) => {
-    if (change.operationType === 'insert') {
-      const newHiring = change.fullDocument;
-      
-      // Populate client data if needed
-      await Hiring.populate(newHiring, { path: 'clientId', select: 'name' });
-      
-      await createNotification(io, {
-        userId: newHiring.contractorId,
-        title: 'New Offer Received',
-        message: `You have a new job offer from ${newHiring.clientId?.name || 'a client'}`,
-        type: 'offer_received',
-        link: `/contracts/${newHiring._id}`
-      });
-    }
-    
-    if (change.operationType === 'update' && change.updateDescription?.updatedFields?.status) {
-      const updatedHiring = change.fullDocument;
-      const status = change.updateDescription.updatedFields.status;
-      
-      await Hiring.populate(updatedHiring, { path: 'contractorId', select: 'name' });
-      
-      if (status === 'accepted') {
-        await createNotification(io, {
-          userId: updatedHiring.clientId,
-          title: 'Offer Accepted',
-          message: `Your offer to ${updatedHiring.contractorId?.name || 'a contractor'} was accepted`,
-          type: 'offer_accepted',
-          link: `/contracts/${updatedHiring._id}`
-        });
-      }
-      
-      if (status === 'declined') {
-        await createNotification(io, {
-          userId: updatedHiring.clientId,
-          title: 'Offer Declined',
-          message: `Your offer to ${updatedHiring.contractorId?.name || 'a contractor'} was declined`,
-          type: 'offer_declined',
-          link: `/contracts/${updatedHiring._id}`
-        });
+  // Watch Contract for milestone updates - REMOVED $lookup, fetch data separately
+  const contractWatcher = Contract.watch([
+    {
+      $match: {
+        operationType: 'update',
+        'updateDescription.updatedFields': { $exists: true }
       }
     }
-  });
+  ], { fullDocument: 'updateLookup' });
 
-  // Watch Contract for milestone updates
-  Contract.watch().on('change', async (change) => {
-    if (change.operationType === 'update' && change.updateDescription?.updatedFields) {
+  contractWatcher.on('change', async (change) => {
+    try {
       const contract = change.fullDocument;
-      const updatedFields = change.updateDescription.updatedFields;
-      
-      // Populate user data if needed
-      await Contract.populate(contract, [
-        { path: 'clientId', select: 'name' },
-        { path: 'contractorId', select: 'name' }
-      ]);
+      const updatedFields = change.updateDescription?.updatedFields;
       
       // Check for milestone updates
-      Object.keys(updatedFields).forEach(async (key) => {
+      for (const [key, value] of Object.entries(updatedFields)) {
         if (key.includes('milestones') && key.includes('status')) {
-          const milestoneStatus = updatedFields[key];
-          
-          if (milestoneStatus === 'completed') {
+          // Fetch user data separately when needed
+          if (value === 'completed') {
+            const contractorData = await User.findById(contract.contractorId).select('name');
+            
             await createNotification(io, {
               userId: contract.clientId,
               title: 'Milestone Completed',
-              message: `A milestone was completed by ${contract.contractorId?.name || 'the contractor'}`,
+              message: `A milestone was completed by ${contractorData?.name || 'the contractor'}`,
               type: 'milestone_completed',
               link: `/contracts/${contract._id}`
             });
           }
           
-          if (milestoneStatus === 'approved') {
+          if (value === 'approved') {
             await createNotification(io, {
               userId: contract.contractorId,
               title: 'Milestone Approved',
@@ -234,22 +315,34 @@ export const setupNotificationWatchers = (io) => {
             });
           }
           
-          if (milestoneStatus === 'disputed') {
+          if (value === 'disputed') {
+            const contractorData = await User.findById(contract.contractorId).select('name');
+            
             await createNotification(io, {
               userId: contract.clientId,
               title: 'Milestone Disputed',
-              message: `A milestone was disputed by ${contract.contractorId?.name || 'the contractor'}`,
+              message: `A milestone was disputed by ${contractorData?.name || 'the contractor'}`,
               type: 'milestone_disputed',
               link: `/contracts/${contract._id}`
             });
           }
         }
-      });
+      }
+    } catch (error) {
+      console.error('Error processing contract notification:', error);
     }
   });
+  activeWatchers.add('contract');
+
+  console.log(`Set up ${activeWatchers.size} notification watchers`);
 };
 
-// API Controllers
+// Clean up watchers on server shutdown
+export const cleanupWatchers = () => {
+  console.log('Cleaning up notification watchers...');
+  activeWatchers.clear();
+};
+
 export const getNotifications = async (req, res) => {
   try {
     const userId = req.params.id;

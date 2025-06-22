@@ -81,7 +81,6 @@ const messageThreadSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Indexes
 messageThreadSchema.index({ participants: 1 });
 messageThreadSchema.index({ jobId: 1 });
 messageThreadSchema.index({ applicationId: 1 });

@@ -15,12 +15,10 @@ const app = express();
 const PORT = process.env.PORT;
 const MAX_RETRIES = parseInt(process.env.MAX_RETRIES) || 3;
 let retryCount = 0;
-const RETRY_INTERVAL = parseInt(process.env.RETRY_INTERVAL) || 3000; // 3 seconds
+const RETRY_INTERVAL = parseInt(process.env.RETRY_INTERVAL) || 3000;
 
-// Create HTTP server
 const httpServer = createServer(app);
 
-// Initialize Socket.io with simplified configuration
 const io = new Server(httpServer, {
   cors: {
     origin: process.env.FRONTEND_URL,
@@ -28,14 +26,12 @@ const io = new Server(httpServer, {
     credentials: true
   },
   connectionStateRecovery: {
-    maxDisconnectionDuration: 2 * 60 * 1000 // 2 minutes
+    maxDisconnectionDuration: 2 * 60 * 1000
   }
 });
 
-// Configure allowed origins
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(origin => origin.trim());
 
-// Middlewares
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) {
@@ -61,26 +57,29 @@ app.set('io', io);
 // Routes
 app.use('/api', routes);
 
-// Socket.io connection handler - Simplified for real-time only
-// ... (previous imports remain the same)
-
 const configureSocketIO = () => {
   io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
     const userId = socket.handshake.auth.userId;
 
-    // Error handling
+    socket.on('rejoin-rooms', (rooms) => {
+      rooms.forEach(room => {
+        socket.join(room);
+        console.log(`User ${userId} rejoined room ${room}`);
+      });
+    });
+    
     socket.on('error', (error) => {
       console.error('Socket error:', error);
     });
 
-    // Join user's personal room for conversation updates
+    // Join user's personal room for notifications
     if (userId) {
-      socket.join(userId);
-      console.log(`User ${userId} joined their personal room`);
+      socket.join(userId.toString());
+      console.log(`User ${userId} joined their personal notification room`);
     }
 
-    // Room management for chat rooms based on jobId and proposalId
+    // Room management for chat rooms
     socket.on('join-chat-room', (roomId) => {
       socket.join(roomId);
       console.log(`User ${userId || socket.id} joined chat room ${roomId}`);
@@ -89,7 +88,6 @@ const configureSocketIO = () => {
     // Handle marking messages as read
     socket.on('mark-as-read', async ({ threadId, userId }) => {
       try {
-        // Notify other participant that messages were read
         const thread = await MessageThread.findById(threadId);
         if (thread) {
           const otherParticipant = thread.participants.find(
@@ -113,6 +111,7 @@ const configureSocketIO = () => {
     });
   });
 
+  // Setup notification watchers AFTER io is configured
   setupNotificationWatchers(io);
   
   // Attach io instance to app for use in controllers
@@ -125,19 +124,17 @@ const startServer = async () => {
     console.log("Connecting to MongoDB...");
     await connectDB();
 
-    // Configure Socket.io - moved before routes to ensure io is available
+    // Configure Socket.io BEFORE starting server
     configureSocketIO();
-
-    // Routes - now io instance is available in controllers
-    app.use('/api', routes);
 
     // Start HTTP server
     httpServer.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
       console.log(`Socket.IO server ready`);
+      console.log('Notification watchers initialized');
     });
 
-    // Error handling with retries
+    // Error handling
     httpServer.on('error', (err) => {
       console.error(`Failed to start server: ${err.message}`);
       if (retryCount < MAX_RETRIES) {
@@ -149,6 +146,16 @@ const startServer = async () => {
         process.exit(1);
       }
     });
+
+    // Graceful shutdown
+    process.on('SIGTERM', () => {
+      console.log('SIGTERM received, shutting down gracefully');
+      cleanupWatchers();
+      httpServer.close(() => {
+        console.log('Process terminated');
+      });
+    });
+
   } catch (error) {
     console.error('Server startup error:', error);
     process.exit(1);

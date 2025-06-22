@@ -1,11 +1,14 @@
-// import emailService from '../utils/nodemailer.js';
-// emailService.sendEmail({ to, subject, text })
 import Transactions from '../../models/transactions.model.js';
 import User from '../../models/user.model.js';
 import Job from '../../models/job.created.model.js';
 import PlatformFees from '../../models/platform.fees.model.js';
 import Stripe from 'stripe';
+import { Fund, Transaction as EscrowTransaction, EscrowAccount, TRANSACTION_TYPE, TRANSACTION_STATUS, FUND_STATUS } from '../../models/escrow.model.js';
+import Contract from '../../models/contract.model.js';
+
 import { createEscrowForFundedProject } from './escrow.controller.js';
+import Transaction from '../../models/transactions.model.js';
+import mongoose from 'mongoose';
 
 const STRIPE_SECRET_KEY = process?.env?.STRIPE_SECRET_KEY || 'sk_test_51RZUzrQpiUcmNrzkun1iqWcxZjk6cZXYc5AtPPznpa9D8vNxzLTVZp836xHyzCnbt7Jl7Qes97bv0TlXMnAO29mU00fuaY1StL';
 
@@ -21,11 +24,11 @@ export const savePaymentMethod = async (req, res) => {
     const { token, userId } = req.body;
 
     console.log('Received request to save payment method:', { userId, token });
-    
+
     if (!token || !userId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Token and user ID are required' 
+      return res.status(400).json({
+        success: false,
+        message: 'Token and user ID are required'
       });
     }
 
@@ -89,8 +92,8 @@ export const savePaymentMethod = async (req, res) => {
     const cardInfo = savedPaymentMethod.card;
     console.log(`Card info for user ${userId}:`, cardInfo);
 
-    res.status(200).json({ 
-      success: true, 
+    res.status(200).json({
+      success: true,
       message: 'Payment method saved successfully',
       data: {
         transactionId: transaction._id,
@@ -105,71 +108,39 @@ export const savePaymentMethod = async (req, res) => {
 
   } catch (error) {
     console.error('Error saving payment method:', error);
-    
+
     if (error.type === 'StripeCardError') {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Card error: ' + error.message 
+      return res.status(400).json({
+        success: false,
+        message: 'Card error: ' + error.message
       });
     }
-    
+
     if (error.type === 'StripeInvalidRequestError') {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid request: ' + error.message 
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid request: ' + error.message
       });
     }
 
     if (error.type === 'StripeAuthenticationError') {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Authentication with Stripe failed' 
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication with Stripe failed'
       });
     }
 
     if (error.type === 'StripeAPIError') {
-      return res.status(500).json({ 
-        success: false, 
-        message: 'Stripe API error occurred' 
+      return res.status(500).json({
+        success: false,
+        message: 'Stripe API error occurred'
       });
     }
-    
-    res.status(500).json({ 
-      success: false, 
+
+    res.status(500).json({
+      success: false,
       message: 'Error saving payment method',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-    });
-  }
-};
-
-export const createBankAccount = async (req, res) => {
-  try {
-    const { userId, bankToken } = req.body;
-    
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
-    }
-
-    const bankAccount = await stripe.customers.createSource(
-      user.stripeCustomerId,
-      { source: bankToken }
-    );
-
-    user.bankAccountId = bankAccount.id;
-    await user.save();
-
-    res.status(200).json({ 
-      success: true,
-      bankAccountId: bankAccount.id,
-      last4: bankAccount.last4
-    });
-  } catch (error) {
-    console.error('Error creating bank account:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Error creating bank account',
-      error: error.message 
     });
   }
 };
@@ -177,15 +148,15 @@ export const createBankAccount = async (req, res) => {
 export const getUserPaymentMethods = async (req, res) => {
   try {
     const userId = req.params.id;
-    
+
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
     if (!user.stripeCustomerId) {
-      return res.status(200).json({ 
-        success: true, 
+      return res.status(200).json({
+        success: true,
         paymentMethods: [],
         message: 'No payment methods found'
       });
@@ -223,29 +194,86 @@ export const getUserPaymentMethods = async (req, res) => {
   }
 };
 
-export const getTransactionHistory = async (req, res) => {
+export const updateDefaultPaymentMethod = async (req, res) => {
   try {
-    const userId = req.params.id;
+    const { userId, paymentMethodId } = req.body;
 
-    if (!userId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'User ID is required' 
+    if (!userId || !paymentMethodId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID and payment method ID are required'
       });
     }
 
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'User not found' 
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Verify the payment method belongs to the user
+    const paymentMethods = await stripe.paymentMethods.list({
+      customer: user.stripeCustomerId,
+      type: 'card',
+    });
+
+    const isValidMethod = paymentMethods.data.some(pm => pm.id === paymentMethodId);
+
+    if (!isValidMethod) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid payment method for this user'
+      });
+    }
+
+    // Update default payment method in Stripe
+    await stripe.customers.update(user.stripeCustomerId, {
+      invoice_settings: {
+        default_payment_method: paymentMethodId
+      }
+    });
+
+    // Update user in database
+    user.defaultPaymentMethod = paymentMethodId;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Default payment method updated successfully'
+    });
+
+  } catch (error) {
+    console.error('Error setting default payment method:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error setting default payment method',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+};
+
+export const getTransactionHistory = async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
       });
     }
 
     const transactions = await Transactions.find({ userId })
       .populate('jobId', 'title description budget')
       .sort({ createdAt: -1 });
-   
+
     const formattedTransactions = transactions.map(transaction => ({
       id: transaction._id,
       type: transaction.type,
@@ -311,8 +339,8 @@ export const getTransactionHistory = async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching transaction history:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       data: {
         transactions: [],
         summary: {
@@ -331,7 +359,7 @@ export const getTransactionHistory = async (req, res) => {
 export const deletePaymentMethod = async (req, res) => {
   try {
     const { userId, paymentMethodId } = req.query;
-    
+
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
@@ -361,82 +389,25 @@ export const deletePaymentMethod = async (req, res) => {
   }
 };
 
-export const setDefaultPaymentMethod = async (req, res) => {
-  try {
-    const { userId, paymentMethodId } = req.body;
-
-    if (!userId || !paymentMethodId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'User ID and payment method ID are required' 
-      });
-    }
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
-    }
-
-    // Verify the payment method belongs to the user
-    const paymentMethods = await stripe.paymentMethods.list({
-      customer: user.stripeCustomerId,
-      type: 'card',
-    });
-
-    const isValidMethod = paymentMethods.data.some(pm => pm.id === paymentMethodId);
-    
-    if (!isValidMethod) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid payment method for this user' 
-      });
-    }
-
-    // Update default payment method in Stripe
-    await stripe.customers.update(user.stripeCustomerId, {
-      invoice_settings: {
-        default_payment_method: paymentMethodId
-      }
-    });
-
-    // Update user in database
-    user.defaultPaymentMethod = paymentMethodId;
-    await user.save();
-
-    res.status(200).json({ 
-      success: true, 
-      message: 'Default payment method updated successfully'
-    });
-
-  } catch (error) {
-    console.error('Error setting default payment method:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error setting default payment method',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-    });
-  }
-};
-
 export const fundProject = async (req, res) => {
   try {
     const { jobId, userId } = req.body;
 
     if (!jobId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Job ID is required' 
+      return res.status(400).json({
+        success: false,
+        message: 'Job ID is required'
       });
     }
 
     const user = await User.findById(userId);
     const job = await Job.findById(jobId);
-    
+
     if (!user || !job) {
       console.log(`User or Job not found: userId=${userId}, jobId=${jobId}`);
-      return res.status(404).json({ 
-        success: false, 
-        message: 'User or Job not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'User or Job not found'
       });
     }
 
@@ -444,25 +415,25 @@ export const fundProject = async (req, res) => {
       console.log(userId, job.userId.toString());
       console.log(`User ${userId} is not the owner of job ${jobId}`);
       console.log(`User ${userId} attempted to fund job ${jobId} they do not own`);
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Unauthorized to fund this project' 
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized to fund this project'
       });
     }
 
     // Validate job state
     if (job.status !== 'open' || job.isFunded) {
       console.log(`Job ${jobId} is not fundable: status=${job.status}, isFunded=${job.isFunded}`);
-      return res.status(200).json({ 
-        success: false, 
-        message: 'Job has already been funded!' 
+      return res.status(200).json({
+        success: false,
+        message: 'Job has already been funded!'
       });
     }
 
     // Calculate amounts
     let amount = 0;
     let description = '';
-    
+
     switch (job.paymentType) {
       case 'fixed-price':
         amount = job.price;
@@ -477,9 +448,9 @@ export const fundProject = async (req, res) => {
         description = `Initial hourly payment (10hrs) for job: ${job.jobTitle}`;
         break;
       default:
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Invalid payment type' 
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid payment type'
         });
     }
 
@@ -489,9 +460,9 @@ export const fundProject = async (req, res) => {
 
     if (!user.stripeCustomerId || !user.defaultPaymentMethod) {
       console.log(`User ${userId} does not have a Stripe customer ID or default payment method`);
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Payment method not set up' 
+      return res.status(400).json({
+        success: false,
+        message: 'Payment method not set up'
       });
     }
 
@@ -561,8 +532,8 @@ export const fundProject = async (req, res) => {
       console.error('Escrow creation failed:', err);
     }
 
-    res.status(200).json({ 
-      success: true, 
+    res.status(200).json({
+      success: true,
       message: 'Project funded successfully',
       transactionId: transaction._id,
       amount: totalAmount
@@ -573,25 +544,25 @@ export const fundProject = async (req, res) => {
 
     // Handle Stripe errors
     if (error.type === 'StripeCardError') {
-      return res.status(400).json({ 
-        success: false, 
-        message: error.message 
+      return res.status(400).json({
+        success: false,
+        message: error.message
       });
     }
-    
+
     if (error.code === 'authentication_required') {
-      return res.status(400).json({ 
-        success: false, 
+      return res.status(400).json({
+        success: false,
         requires_action: true,
         payment_intent_id: error.payment_intent.id,
         message: 'Authentication required'
       });
     }
 
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Internal server error',
-      error: error.message 
+      error: error.message
     });
   }
 };
@@ -599,7 +570,7 @@ export const fundProject = async (req, res) => {
 export const getPlatformFee = async (req, res) => {
   try {
     const platformFees = await PlatformFees.getSettings();
-    
+
     return res.status(200).json({
       success: true,
       data: {
@@ -617,57 +588,873 @@ export const getPlatformFee = async (req, res) => {
   }
 };
 
-export const getAvailableBalance = async (req, res) => {
+export const getPayoutMethods = async (req, res) => {
   try {
-    const { userId } = req.params;
-    
-    // Calculate available balance from completed jobs
-    const completedJobs = await Job.find({
-      freelancerId: userId,
-      status: 'completed',
-      isPaidOut: false
-    });
-    
-    const balance = completedJobs.reduce((sum, job) => sum + job.price, 0);
-    
-    res.status(200).json({ success: true, availableBalance: balance });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Error fetching balance' });
-  }
-};
+    const userId = req.params.id;
+    const user = await User.findById(userId);
 
-export const processWithdrawal = async (req, res) => {
-  try {
-    const { userId, amount, paymentMethodId } = req.body;
-    
-    // Verify user has sufficient balance
-    const balanceResponse = await getAvailableBalance(userId);
-    if (balanceResponse.availableBalance < amount) {
-      return res.status(400).json({ success: false, message: 'Insufficient funds' });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
     }
 
-    // Create payout
-    const payout = await stripe.payouts.create({
-      amount: Math.round(amount * 100),
-      currency: 'usd',
-      method: 'instant',
-      destination: paymentMethodId
+    const payoutMethods = (user.bankAccounts || []).map(account => ({
+      id: account.id || account._id,
+      type: 'bank',
+      bankName: account.bankName,
+      last4: account.last4,
+      isPrimary: account.$isDefault || account.default,
+      country: account.country,
+      currency: account.currency
+    }));
+
+    res.status(200).json({
+      success: true,
+      payoutMethods
     });
 
-    // Update transactions
-    const transaction = await Transactions.create({
-      userId,
-      type: 'payout',
-      amount: amount,
-      status: 'pending',
-      paymentMethod: 'bank_account',
-      stripePayoutId: payout.id
-    });
-
-    res.status(200).json({ success: true, payoutId: payout.id });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Withdrawal failed' });
+    res.status(500).json({ success: false, payoutMethods: [] });
   }
 };
 
+export const releaseFunds = async (req, res) => {
+  try {
+    const { contractId, userId } = req.body;
+    console.log('Releasing funds for contract:', contractId, 'by user:', userId);
 
+    if (!contractId || !userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Contract ID and User ID are required'
+      });
+    }
+
+    // Find contract and validate client ownership
+    const contract = await Contract.findById({ _id: contractId })
+      .populate('jobId')
+      .populate('contractorId', 'stripeAccountId');
+
+    console.log('Found contract:', contract);
+
+    if (!contract) {
+      return res.status(404).json({
+        success: false,
+        message: 'Contract not found'
+      });
+    }
+
+    console.log('Contract found:', contract);
+
+    if (contract.clientId.toString() !== userId.toString()) {
+      console.log(`User ${userId} is not the client of contract ${contractId}`);
+      return res.status(403).json({
+        success: false,
+        message: 'Only contract client can release funds'
+      });
+    }
+
+    if (contract.status !== 'completed') {
+      return res.status(400).json({
+        success: false,
+        message: 'Contract must be completed to release funds'
+      });
+    }
+
+    // Find associated fund
+    const fund = await Fund.findOne({ job_id: contract.jobId._id });
+    if (!fund) {
+      return res.status(404).json({
+        success: false,
+        message: 'Fund not found for this job'
+      });
+    }
+
+    if (fund.status !== 'available') {
+      return res.status(400).json({
+        success: false,
+        message: 'Funds are not available for release'
+      });
+    }
+
+    fund.contractor_id = contract.contractorId._id;
+    fund.status = 'pending_review';
+    await fund.save();
+
+    // Create pending release transaction
+    const releaseTransaction = new EscrowTransaction({
+      fund_id: fund._id,
+      type: 'release',
+      amount: fund.amount,
+      currency: fund.currency,
+      initiated_by: userId,
+      status: 'pending',
+      notes: `Funds released by client for contract: ${contractId}`
+    });
+    await releaseTransaction.save();
+    console.log('Release transaction created:', releaseTransaction);
+
+    // Create transaction record
+    await Transactions.create({
+      userId: contract.contractorId._id,
+      jobId: contract.jobId._id,
+      type: 'payout_pending',
+      amount: fund.amount,
+      status: 'pending',
+      paymentMethod: 'escrow',
+      description: `Funds released for contract ${contractId} - awaiting admin approval`
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Funds released successfully. Awaiting admin approval.',
+      transactionId: releaseTransaction._id
+    });
+
+  } catch (error) {
+    console.error('Error releasing funds:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error releasing funds',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+}
+
+export const saveBankAccount = async (req, res) => {
+  try {
+    const { userId, token } = req.body;
+    console.log('Saving bank account for user:', userId);
+    console.log('Received token:', token);
+
+    if (!userId || !token) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID and token are required'
+      });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Verify token with Stripe
+    const bankAccountToken = await stripe.tokens.retrieve(token);
+    if (!bankAccountToken.bank_account) {
+      return res.status(400).json({ success: false, message: 'Invalid bank account token' });
+    }
+
+    const bankDetails = bankAccountToken.bank_account;
+
+    // Create Stripe Connect account if it doesn't exist
+    if (!user.stripeAccountId) {
+      try {
+        const account = await stripe.accounts.create({
+          type: 'express',
+          email: user.email,
+          capabilities: {
+            transfers: { requested: true },
+          },
+          business_type: 'individual',
+          individual: {
+            email: user.email,
+            first_name: user.name.split(' ')[0] || user.name,
+            last_name: user.name.split(' ').slice(1).join(' ') || '',
+          },
+        });
+
+        user.stripeAccountId = account.id;
+        await user.save();
+        console.log('Created Stripe Connect account:', account.id);
+      } catch (error) {
+        console.error('Error creating Stripe Connect account:', error);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to create payment account',
+          error: error.message
+        });
+      }
+    }
+
+    // Add bank account to Stripe Connect account
+    let externalAccount;
+    try {
+      externalAccount = await stripe.accounts.createExternalAccount(user.stripeAccountId, {
+        external_account: token
+      });
+      console.log('External account created:', externalAccount);
+    } catch (error) {
+      console.error('Error creating external account:', error);
+      return res.status(400).json({
+        success: false,
+        message: 'Bank account verification failed',
+        error: error.message
+      });
+    }
+
+    // Save bank account details to user document
+    const newBankAccount = {
+      id: externalAccount.id,
+      bankName: bankDetails.bank_name || 'Unknown Bank',
+      last4: bankDetails.last4,
+      country: bankDetails.country,
+      currency: bankDetails.currency,
+      isDefault: !user.bankAccounts || user.bankAccounts.length === 0
+    };
+
+    // Initialize bankAccounts array if it doesn't exist
+    if (!user.bankAccounts) {
+      user.bankAccounts = [];
+    }
+
+    user.bankAccounts.push(newBankAccount);
+    await user.save();
+
+    console.log('Bank account saved successfully for user:', userId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Bank account saved successfully',
+      bankAccount: newBankAccount
+    });
+  } catch (error) {
+    console.error('Error saving bank account:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error saving bank account',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+export const createOnboardingLink = async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (!user.stripeAccountId) {
+      return res.status(400).json({
+        success: false,
+        message: 'No Stripe account found. Please add a bank account first.'
+      });
+    }
+
+    // Create account link for onboarding
+    const accountLink = await stripe.accountLinks.create({
+      account: user.stripeAccountId,
+      refresh_url: `${process.env.FRONTEND_URL}/payment/payout-setup?refresh=true`,
+      return_url: `${process.env.FRONTEND_URL}/payment/payout-setup?success=true`,
+      type: 'account_onboarding',
+    });
+
+    res.status(200).json({
+      success: true,
+      onboardingUrl: accountLink.url
+    });
+
+  } catch (error) {
+    console.error('Error creating onboarding link:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create onboarding link',
+      error: error.message
+    });
+  }
+};
+
+export const getAccountStatus = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    console.log('hit!  ::: ', userId)
+    const user = await User.findById(userId);
+    if (!user || !user.stripeAccountId) {
+      return res.status(404).json({
+        success: false,
+        message: 'No Stripe account found'
+      });
+    }
+
+    const account = await stripe.accounts.retrieve(user.stripeAccountId);
+
+    res.status(200).json({
+      success: true,
+      account: {
+        id: account.id,
+        payouts_enabled: account.payouts_enabled,
+        charges_enabled: account.charges_enabled,
+        details_submitted: account.details_submitted,
+        requirements: account.requirements,
+        capabilities: account.capabilities
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching account status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch account status',
+      error: error.message
+    });
+  }
+};
+
+export const createBankAccount = async (req, res) => {
+  try {
+    const { userId, bankToken } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const bankAccount = await stripe.customers.createSource(
+      user.stripeCustomerId,
+      { source: bankToken }
+    );
+
+    user.bankAccountId = bankAccount.id;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      bankAccountId: bankAccount.id,
+      last4: bankAccount.last4
+    });
+  } catch (error) {
+    console.error('Error creating bank account:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating bank account',
+      error: error.message
+    });
+  }
+};
+
+export const createFreelancerAccount = async (userId) => {
+  const user = await User.findById(userId);
+
+  const account = await stripe.accounts.create({
+    type: 'express',
+    email: user.email,
+    capabilities: {
+      transfers: { requested: true },
+    },
+    business_type: 'individual',
+    individual: {
+      email: user.email,
+      first_name: user.firstName,
+      last_name: user.lastName,
+    },
+  });
+
+  user.stripeAccountId = account.id;
+  await user.save();
+
+  // Create account link for onboarding
+  const accountLink = await stripe.accountLinks.create({
+    account: account.id,
+    refresh_url: 'http://localhost:3000/payment/disburse',
+    return_url: 'http://localhost:3000/payment/disburse',
+    type: 'account_onboarding',
+  });
+
+  return accountLink.url;
+};
+
+export const verifyBankAccount = async (req, res) => {
+  try {
+    const { userId, amounts } = req.body; // amounts is [32, 45] for example
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const defaultAccount = user.bankAccounts.find(acc => acc.isDefault);
+    if (!defaultAccount) {
+      return res.status(400).json({ success: false, message: 'No default bank account' });
+    }
+
+    await stripe.accounts.verifyExternalAccount(
+      user.stripeAccountId,
+      defaultAccount.id,
+      { amounts } // [32, 45] for example
+    );
+
+    res.status(200).json({ success: true, message: 'Bank account verified' });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: 'Verification failed',
+      error: error.message
+    });
+  }
+};
+
+export const getPendingPayouts = async (req, res) => {
+  try {
+
+    const adminId = req.params.id;
+
+    if (!adminId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Admin ID is required'
+      });
+    }
+
+    const pendingFunds = await Fund.find({
+      status: 'pending_review'
+    })
+      .populate({
+        path: 'client_id',
+        select: 'name email phoneNumber role'
+      })
+      .populate({
+        path: 'contractor_id',
+        select: 'name email phoneNumber stripeCustomerId stripeAccountId bankAccounts role'
+      })
+      .populate({
+        path: 'job_id',
+        select: 'jobTitle description price paymentType location clientName status createdAt'
+      })
+      .sort({ created_at: -1 }); // Most recent first
+
+
+    if (!pendingFunds || pendingFunds.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: 'No pending payouts found',
+        data: [],
+        count: 0
+      });
+    }
+
+
+    const payoutsWithContractDetails = await Promise.all(
+      pendingFunds.map(async (fund) => {
+        try {
+          // Find the contract associated with this job
+          const contract = await Contract.findOne({
+            jobId: fund.job_id._id
+          })
+            .populate({
+              path: 'contractorId',
+              select: 'name email bankAccounts stripeAccountId'
+            })
+            .populate({
+              path: 'clientId',
+              select: 'name email'
+            })
+            .select('hiringId startDate status paymentStructure milestones timesheets retainer createdAt updatedAt');
+
+          // Get escrow account details for the client
+          const escrowAccount = await EscrowAccount.findOne({
+            client_id: fund.client_id._id
+          }).select('balance currency frozen total_funded total_released');
+
+          // Get related transactions for this fund
+          const transactions = await Transaction.find({
+            fund_id: fund._id
+          })
+            .populate('initiated_by', 'name email role')
+            .sort({ timestamp: -1 })
+            .limit(5);
+
+          const fundAge = Math.floor((new Date() - fund.created_at) / (1000 * 60 * 60 * 24)); // days
+          const isOverdue = fund.due_date && fund.due_date < new Date();
+          const canRelease = fund.canRelease ? fund.canRelease() : true;
+
+          return {
+            // Fund details
+            fundId: fund._id,
+            amount: fund.amount,
+            currency: fund.currency,
+            status: fund.status,
+            dueDate: fund.due_date,
+            createdAt: fund.created_at,
+            updatedAt: fund.updated_at,
+            milestoneTitle: fund.milestone_title,
+            milestoneDescription: fund.milestone_description,
+            workSubmittedAt: fund.work_submitted_at,
+            reviewRequestedAt: fund.review_requested_at,
+            adminNotes: fund.admin_notes,
+
+            // Calculated fields
+            fundAgeInDays: fundAge,
+            isOverdue: isOverdue,
+            canRelease: canRelease,
+            isDelayed: fund.is_delayed,
+            delayUntil: fund.delay_until,
+            delayReason: fund.delay_reason,
+
+            // Job details - now this will work with populate
+            job: {
+              id: fund.job_id._id,
+              title: fund.job_id.jobTitle,
+              description: fund.job_id.description,
+              price: fund.job_id.price,
+              paymentType: fund.job_id.paymentType,
+              location: fund.job_id.location,
+              clientName: fund.job_id.clientName,
+              status: fund.job_id.status,
+              createdAt: fund.job_id.createdAt
+            },
+
+            // Client details
+            client: {
+              id: fund.client_id._id,
+              name: fund.client_id.name,
+              email: fund.client_id.email,
+              phoneNumber: fund.client_id.phoneNumber,
+              role: fund.client_id.role,
+              stripeCustomerId: fund.client_id.stripeCustomerId,
+            },
+
+            // Contractor details (recipient of the payout)
+            contractor: {
+              id: fund.contractor_id._id,
+              name: fund.contractor_id.name,
+              email: fund.contractor_id.email,
+              phoneNumber: fund.contractor_id.phoneNumber,
+              role: fund.contractor_id.role,
+              stripeAccountId: fund.contractor_id.stripeAccountId,
+              bankAccounts: fund.contractor_id.bankAccounts,
+              // This is crucial for payout processing
+              canReceivePayout: !!fund.contractor_id.stripeAccountId &&
+                fund.contractor_id.bankAccounts &&
+                fund.contractor_id.bankAccounts.length > 0
+            },
+
+            // Contract details
+            contract: contract ? {
+              id: contract._id,
+              hiringId: contract.hiringId,
+              startDate: contract.startDate,
+              status: contract.status,
+              paymentStructure: contract.paymentStructure,
+              milestonesCount: contract.milestones ? contract.milestones.length : 0,
+              completedMilestones: contract.milestones ?
+                contract.milestones.filter(m => m.status === 'completed').length : 0,
+              timesheetsCount: contract.timesheets ? contract.timesheets.length : 0,
+              hasRetainer: !!contract.retainer,
+              createdAt: contract.createdAt
+            } : null,
+
+            // Escrow account details
+            escrowAccount: escrowAccount ? {
+              balance: escrowAccount.balance,
+              currency: escrowAccount.currency,
+              frozen: escrowAccount.frozen,
+              totalFunded: escrowAccount.total_funded,
+              totalReleased: escrowAccount.total_released,
+              hasSufficientFunds: escrowAccount.balance >= fund.amount
+            } : null,
+
+            // Recent transactions
+            recentTransactions: transactions.map(t => ({
+              id: t._id,
+              type: t.type,
+              amount: t.amount,
+              status: t.status,
+              timestamp: t.timestamp,
+              initiatedBy: t.initiated_by ? {
+                name: t.initiated_by.name,
+                email: t.initiated_by.email,
+                role: t.initiated_by.role
+              } : null,
+              notes: t.notes
+            }))
+          };
+        } catch (error) {
+          console.error(`Error processing fund ${fund._id}:`, error);
+          // Return basic fund info if detailed processing fails
+          return {
+            fundId: fund._id,
+            amount: fund.amount,
+            currency: fund.currency,
+            status: fund.status,
+            error: 'Failed to load complete details',
+            client: fund.client_id,
+            contractor: fund.contractor_id,
+            job: fund.job_id
+          };
+        }
+      })
+    );
+
+    // Filter out any null results and sort by priority
+    const validPayouts = payoutsWithContractDetails
+      .filter(payout => payout)
+      .sort((a, b) => {
+        // Sort by overdue first, then by age
+        if (a.isOverdue && !b.isOverdue) return -1;
+        if (!a.isOverdue && b.isOverdue) return 1;
+        return b.fundAgeInDays - a.fundAgeInDays;
+      });
+
+    // Calculate summary statistics
+    const summary = {
+      totalPendingPayouts: validPayouts.length,
+      totalAmount: validPayouts.reduce((sum, payout) => sum + payout.amount, 0),
+      overdueCount: validPayouts.filter(p => p.isOverdue).length,
+      delayedCount: validPayouts.filter(p => p.isDelayed).length,
+      readyToReleaseCount: validPayouts.filter(p => p.canRelease && !p.isDelayed).length,
+      averageAge: validPayouts.length > 0 ?
+        Math.round(validPayouts.reduce((sum, p) => sum + p.fundAgeInDays, 0) / validPayouts.length) : 0,
+      currencies: [...new Set(validPayouts.map(p => p.currency))],
+      insufficientFundsCount: validPayouts.filter(p =>
+        p.escrowAccount && !p.escrowAccount.hasSufficientFunds
+      ).length
+    };
+
+    res.status(200).json({
+      success: true,
+      message: `Found ${validPayouts.length} pending payouts`,
+      data: validPayouts,
+      summary: summary,
+      count: validPayouts.length
+    });
+
+  } catch (error) {
+    console.error('Error fetching pending payouts:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching pending payouts',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+};
+
+export const approvePayout = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const fundId = req.params.id;
+    const { adminId } = req.query;
+
+    if (!fundId || !adminId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Fund ID and Admin ID are required'
+      });
+    }
+
+    const fund = await Fund.findById(fundId)
+      .populate('client_id', 'stripeCustomerId')
+      .populate('contractor_id', 'stripeAccountId bankAccounts')
+      .populate('job_id')
+      .session(session);
+
+    if (!fund) {
+      console.log('Fund not found')
+      return res.status(404).json({
+        success: false,
+        message: 'Fund not found'
+      });
+    }
+
+    if (![FUND_STATUS.PENDING_REVIEW, FUND_STATUS.IN_REVIEW].includes(fund.status)) {
+      console.log(`Fund not in payable state: ${fund.status}`);
+      return res.status(400).json({
+        success: false,
+        message: `Fund not in payable state. Current status: ${fund.status}`
+      });
+    }
+
+    if (fund.is_delayed) {
+      console.log(`Payout delayed until ${fund.delay_until}`);
+      return res.status(400).json({
+        success: false,
+        message: `Payout delayed until ${fund.delay_until}`
+      });
+    }
+
+    const contractor = fund.contractor_id;
+    const client = fund.client_id;
+
+    const accountExists = await stripe.accounts.retrieve(contractor.stripeAccountId);
+    console.log('accountExists', accountExists);
+
+    // Check if account is ready for payouts
+    if (!accountExists || accountExists.deleted) {
+      console.log('Contractor Stripe account does not exist or has been deleted');
+      return res.status(400).json({
+        success: false,
+        message: 'Contractor Stripe account does not exist or has been deleted'
+      });
+    }
+
+    if (!accountExists.payouts_enabled) {
+      console.log('Contractor Stripe account is not enabled for payouts');
+      return res.status(400).json({
+        success: false,
+        message: 'Contractor account setup incomplete. Please complete your Stripe onboarding.',
+        requirements: accountExists.requirements.currently_due
+      });
+    }
+
+    if (accountExists.capabilities.transfers !== 'active') {
+      console.log('Transfer capability not active');
+      return res.status(400).json({
+        success: false,
+        message: 'Account not ready for transfers. Please complete verification.'
+      });
+    }
+
+    if (!contractor.stripeAccountId || !contractor.bankAccounts?.length) {
+      console.log('Contractor has incomplete payment setup');
+      return res.status(400).json({
+        success: false,
+        message: 'Contractor has incomplete payment setup'
+      });
+    }
+
+    // Retrieve escrow account
+    const escrowAccount = await EscrowAccount.findOne({ client_id: client._id }).session(session);
+
+    if (!escrowAccount) {
+      console.log('Escrow account not found for client:', client._id);
+      return res.status(400).json({
+        success: false,
+        message: 'Escrow account not found'
+      });
+    }
+
+    if (escrowAccount.balance < fund.amount) {
+      return res.status(400).json({
+        success: false,
+        message: `Insufficient escrow funds. Available: ${escrowAccount.balance} ${fund.currency}`
+      });
+    }
+
+    const platformFeePercentage = 0.05;
+    const platformFee = parseFloat((fund.amount * platformFeePercentage).toFixed(2));
+    const netAmount = parseFloat((fund.amount - platformFee).toFixed(2));
+
+    const netAmountCents = Math.round(netAmount * 100);
+    const feeCents = Math.round(platformFee * 100);
+
+    const payout = await stripe.payouts.create({
+      amount: netAmountCents,
+      currency: fund.currency.toLowerCase(),
+      method: 'instant',
+      destination: contractor.stripeAccountId,
+      metadata: {
+        fundId: fundId,
+        jobId: fund.job_id._id.toString(),
+        adminId: adminId,
+        platformFee: feeCents
+      }
+    }, {
+      idempotencyKey: `payout-${fundId}-${Date.now()}`
+    });
+
+    console.log('Payout created:', payout);
+
+    escrowAccount.balance = parseFloat((escrowAccount.balance - fund.amount).toFixed(2));
+    escrowAccount.total_released = parseFloat((escrowAccount.total_released + fund.amount).toFixed(2));
+    await escrowAccount.save({ session });
+
+    // Update fund status
+    fund.status = FUND_STATUS.RELEASED;
+    fund.released_at = new Date();
+    fund.admin_notes = `Approved by admin ${adminId} at ${new Date().toISOString()}`;
+    await fund.save({ session });
+
+    const releaseTransaction = await Transaction.create([{
+      fund_id: fund._id,
+      type: TRANSACTION_TYPE.RELEASE,
+      amount: fund.amount,
+      currency: fund.currency,
+      initiated_by: adminId,
+      status: TRANSACTION_STATUS.COMPLETED,
+      notes: `Payout to ${contractor.name}. Net: ${netAmount} ${fund.currency}`,
+      external_transaction_id: payout.id,
+      fee_amount: platformFee,
+      net_amount: netAmount,
+      timestamp: new Date()
+    }], { session });
+
+    console.log('Release transaction created:', releaseTransaction);
+
+    await Transaction.create([{
+      type: TRANSACTION_TYPE.PLATFORM_FEE,
+      amount: platformFee,
+      currency: fund.currency,
+      initiated_by: adminId,
+      status: TRANSACTION_STATUS.COMPLETED,
+      notes: `Platform fee for payout ${payout.id}`,
+      external_transaction_id: `fee_${payout.id}`,
+      timestamp: new Date()
+    }], { session });
+
+    // Update job status if all milestones are paid
+    const jobMilestones = await Fund.find({ job_id: fund.job_id._id });
+    const allMilestonesPaid = jobMilestones.every(m =>
+      m.status === FUND_STATUS.RELEASED
+    );
+
+    if (allMilestonesPaid) {
+      await Job.findByIdAndUpdate(
+        fund.job_id._id,
+        { status: 'completed', isPaidOut: true },
+        { session }
+      );
+    }
+
+    await session.commitTransaction();
+
+    console.log('Payout approved successfully:', payout);
+
+    res.status(200).json({
+      success: true,
+      message: 'Payout approved successfully',
+      data: {
+        payoutId: payout.id,
+        netAmount,
+        platformFee,
+        currency: fund.currency,
+        releaseTransaction: releaseTransaction[0]
+      }
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+
+    console.error('Payout approval failed:', error);
+
+    // Handle Stripe errors specifically
+    if (error.type === 'StripeAPIError' || error.type === 'StripeConnectionError') {
+      return res.status(502).json({
+        success: false,
+        message: 'Payment processing error',
+        error: error.message
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Payout approval failed',
+      error: error.message
+    });
+  } finally {
+    session.endSession();
+  }
+};

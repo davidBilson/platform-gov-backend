@@ -17,6 +17,7 @@ const TransactionSchema = new mongoose.Schema({
     enum: [
       'payment_method_added',
       'project_funding',
+      'payout_pending',
       'payout',
       'refund',
       'dispute'
@@ -52,7 +53,7 @@ const TransactionSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['card', 'bank_account', 'paypal'],
+    enum: ['card', 'bank_account', 'paypal', 'escrow'],
     required: true
   },
   stripePaymentIntentId: String,

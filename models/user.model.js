@@ -48,19 +48,26 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  
-  stripeCustomerId: String,
-  stripeAccountId: String,
-  defaultPaymentMethod: String,
+  stripeCustomerId: {
+    type: String,
+    default: null
+  },
+  stripeAccountId: {
+    type: String,
+    default: null
+  },
+  defaultPaymentMethod: {
+    type: String,
+    default: null
+  },
   bankAccounts: [{
     id: String,
-    last4: String,
     bankName: String,
+    last4: String,
     country: String,
     currency: String,
-    default: Boolean
+    isDefault: Boolean
   }],
-
   emailVerificationCode: String,
   phoneVerificationCode: String,
   resetToken: String,

@@ -41,7 +41,7 @@ const fundSchema = new Schema({
     type: Schema.Types.ObjectId,
     required: true,
     index: true,
-    ref: 'Job' // Assuming you have a Job model
+    ref: 'Jobs'
   },
   client_id: {
     type: Schema.Types.ObjectId,
@@ -49,7 +49,7 @@ const fundSchema = new Schema({
     index: true,
     ref: 'User' // Assuming clients are User documents
   },
-  freelancer_id: {
+  contractor_id: {
     type: Schema.Types.ObjectId,
     index: true,
     ref: 'User' // Assuming freelancers are User documents
