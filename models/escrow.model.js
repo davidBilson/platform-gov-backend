@@ -16,7 +16,8 @@ const TRANSACTION_TYPE = {
   RELEASE: 'release',
   REFUND: 'refund',
   DISPUTE_HOLD: 'dispute_hold',
-  DISPUTE_RESOLVE: 'dispute_resolve'
+  DISPUTE_RESOLVE: 'dispute_resolve',
+  PLATFORM_FEE: 'platform_fee'
 };
 
 const TRANSACTION_STATUS = {
@@ -53,6 +54,23 @@ const fundSchema = new Schema({
     type: Schema.Types.ObjectId,
     index: true,
     ref: 'User' // Assuming freelancers are User documents
+  },
+  is_processed: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  
+  processing_attempts: {
+    type: Number,
+    default: 0,
+    max: 3
+  },
+  
+  stripe_transfer_id: {
+    type: String,
+    sparse: true,
+    unique: true
   },
   amount: {
     type: Number,
@@ -124,7 +142,8 @@ const fundSchema = new Schema({
 
 // Compound indexes for efficient queries
 fundSchema.index({ client_id: 1, status: 1 });
-fundSchema.index({ freelancer_id: 1, status: 1 });
+fundSchema.index({ status: 1, createdAt: -1 });
+fundSchema.index({ contractor_id: 1, status: 1 });
 fundSchema.index({ job_id: 1, status: 1 });
 fundSchema.index({ created_at: -1 });
 
@@ -259,11 +278,9 @@ const transactionSchema = new Schema({
     index: true,
     ref: 'Fund'
   },
-  type: {
-    type: String,
-    required: true,
-    enum: Object.values(TRANSACTION_TYPE),
-    index: true
+  userId: {
+    type: Schema.Types.ObjectId,
+    ref: 'User'
   },
   amount: {
     type: Number,
@@ -280,12 +297,6 @@ const transactionSchema = new Schema({
     required: true,
     enum: CURRENCY_CODES,
     uppercase: true
-  },
-  initiated_by: {
-    type: Schema.Types.ObjectId,
-    required: true,
-    index: true,
-    ref: 'User'
   },
   status: {
     type: String,
@@ -315,8 +326,6 @@ const transactionSchema = new Schema({
 
 // Compound indexes for efficient queries
 transactionSchema.index({ fund_id: 1, timestamp: -1 });
-transactionSchema.index({ initiated_by: 1, timestamp: -1 });
-transactionSchema.index({ type: 1, status: 1 });
 transactionSchema.index({ timestamp: -1 });
 
 // Virtual for net amount (amount minus fees)
@@ -498,6 +507,8 @@ fundSchema.pre('save', function(next) {
 });
 
 // Transaction pre-save middleware
+
+
 transactionSchema.pre('save', function(next) {
   if (this.isModified('status') && this.status === TRANSACTION_STATUS.COMPLETED) {
     this.processed_at = new Date();
@@ -731,10 +742,8 @@ fundSchema.methods.adminRelease = async function(adminId, reason) {
   // Create release transaction
   const transaction = new Transaction({
     fund_id: this._id,
-    type: TRANSACTION_TYPE.RELEASE,
     amount: this.amount,
     currency: this.currency,
-    initiated_by: adminId,
     status: TRANSACTION_STATUS.COMPLETED,
     notes: `Admin release: ${reason}`
   });

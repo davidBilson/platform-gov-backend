@@ -591,6 +591,7 @@ export const getPlatformFee = async (req, res) => {
 export const getPayoutMethods = async (req, res) => {
   try {
     const userId = req.params.id;
+
     const user = await User.findById(userId);
 
     if (!user) {
@@ -835,6 +836,7 @@ export const createOnboardingLink = async (req, res) => {
   try {
     const userId = req.params.id;
 
+    console.log('hit createonboardlink: ', userId)
     if (!userId) {
       return res.status(400).json({
         success: false,
@@ -880,7 +882,6 @@ export const createOnboardingLink = async (req, res) => {
 export const getAccountStatus = async (req, res) => {
   try {
     const userId = req.params.id;
-    console.log('hit!  ::: ', userId)
     const user = await User.findById(userId);
     if (!user || !user.stripeAccountId) {
       return res.status(404).json({
@@ -1006,6 +1007,18 @@ export const verifyBankAccount = async (req, res) => {
   }
 };
 
+
+const generateIdempotencyKey = (fundId, adminId) => {
+  return `transfer-${fundId}-${adminId}`;
+};
+
+export const cleanupLock = async (req, res, next) => {
+  if (req.lockKey) {
+    await Lock.deleteOne({ key: req.lockKey });
+  }
+  next();
+};
+
 export const getPendingPayouts = async (req, res) => {
   try {
 
@@ -1031,9 +1044,9 @@ export const getPendingPayouts = async (req, res) => {
       })
       .populate({
         path: 'job_id',
-        select: 'jobTitle description price paymentType location clientName status createdAt'
+        select: '_id jobTitle description price paymentType location clientName status createdAt'
       })
-      .sort({ created_at: -1 }); // Most recent first
+      .sort({ created_at: -1 });
 
 
     if (!pendingFunds || pendingFunds.length === 0) {
@@ -1045,11 +1058,11 @@ export const getPendingPayouts = async (req, res) => {
       });
     }
 
-
     const payoutsWithContractDetails = await Promise.all(
       pendingFunds.map(async (fund) => {
+
         try {
-          // Find the contract associated with this job
+
           const contract = await Contract.findOne({
             jobId: fund.job_id._id
           })
@@ -1063,25 +1076,20 @@ export const getPendingPayouts = async (req, res) => {
             })
             .select('hiringId startDate status paymentStructure milestones timesheets retainer createdAt updatedAt');
 
-          // Get escrow account details for the client
           const escrowAccount = await EscrowAccount.findOne({
             client_id: fund.client_id._id
           }).select('balance currency frozen total_funded total_released');
 
-          // Get related transactions for this fund
           const transactions = await Transaction.find({
             fund_id: fund._id
           })
-            .populate('initiated_by', 'name email role')
             .sort({ timestamp: -1 })
             .limit(5);
 
           const fundAge = Math.floor((new Date() - fund.created_at) / (1000 * 60 * 60 * 24)); // days
           const isOverdue = fund.due_date && fund.due_date < new Date();
           const canRelease = fund.canRelease ? fund.canRelease() : true;
-
           return {
-            // Fund details
             fundId: fund._id,
             amount: fund.amount,
             currency: fund.currency,
@@ -1103,7 +1111,6 @@ export const getPendingPayouts = async (req, res) => {
             delayUntil: fund.delay_until,
             delayReason: fund.delay_reason,
 
-            // Job details - now this will work with populate
             job: {
               id: fund.job_id._id,
               title: fund.job_id.jobTitle,
@@ -1116,7 +1123,6 @@ export const getPendingPayouts = async (req, res) => {
               createdAt: fund.job_id.createdAt
             },
 
-            // Client details
             client: {
               id: fund.client_id._id,
               name: fund.client_id.name,
@@ -1126,7 +1132,6 @@ export const getPendingPayouts = async (req, res) => {
               stripeCustomerId: fund.client_id.stripeCustomerId,
             },
 
-            // Contractor details (recipient of the payout)
             contractor: {
               id: fund.contractor_id._id,
               name: fund.contractor_id.name,
@@ -1141,7 +1146,6 @@ export const getPendingPayouts = async (req, res) => {
                 fund.contractor_id.bankAccounts.length > 0
             },
 
-            // Contract details
             contract: contract ? {
               id: contract._id,
               hiringId: contract.hiringId,
@@ -1156,7 +1160,6 @@ export const getPendingPayouts = async (req, res) => {
               createdAt: contract.createdAt
             } : null,
 
-            // Escrow account details
             escrowAccount: escrowAccount ? {
               balance: escrowAccount.balance,
               currency: escrowAccount.currency,
@@ -1166,18 +1169,12 @@ export const getPendingPayouts = async (req, res) => {
               hasSufficientFunds: escrowAccount.balance >= fund.amount
             } : null,
 
-            // Recent transactions
             recentTransactions: transactions.map(t => ({
               id: t._id,
               type: t.type,
               amount: t.amount,
               status: t.status,
               timestamp: t.timestamp,
-              initiatedBy: t.initiated_by ? {
-                name: t.initiated_by.name,
-                email: t.initiated_by.email,
-                role: t.initiated_by.role
-              } : null,
               notes: t.notes
             }))
           };
@@ -1198,6 +1195,8 @@ export const getPendingPayouts = async (req, res) => {
       })
     );
 
+
+    console.log('payoutsWithContractDetails: : : ', payoutsWithContractDetails)
     // Filter out any null results and sort by priority
     const validPayouts = payoutsWithContractDetails
       .filter(payout => payout)
@@ -1248,7 +1247,7 @@ export const approvePayout = async (req, res) => {
   try {
     const fundId = req.params.id;
     const { adminId } = req.query;
-
+    
     if (!fundId || !adminId) {
       return res.status(400).json({
         success: false,
@@ -1256,17 +1255,56 @@ export const approvePayout = async (req, res) => {
       });
     }
 
-    const fund = await Fund.findById(fundId)
-      .populate('client_id', 'stripeCustomerId')
-      .populate('contractor_id', 'stripeAccountId bankAccounts')
-      .populate('job_id')
-      .session(session);
+    const idempotencyKey = generateIdempotencyKey(fundId, adminId);
+
+   const fund = await Fund.findOneAndUpdate(
+      {
+        _id: fundId,
+        status: { $in: [FUND_STATUS.PENDING_REVIEW, FUND_STATUS.IN_REVIEW] },
+        is_processed: false,
+        stripe_transfer_id: { $exists: false }
+      },
+      {
+        $set: {
+          is_processed: true,
+          status: FUND_STATUS.IN_REVIEW,
+          processing_attempts: { $inc: 1 }
+        }
+      },
+      {
+        new: true,
+        session,
+        populate: [
+          { path: 'client_id', select: 'stripeCustomerId' },
+          { path: 'contractor_id', select: 'stripeAccountId bankAccounts' },
+          { path: 'job_id' }
+        ]
+      }
+    );
 
     if (!fund) {
-      console.log('Fund not found')
+      await session.abortTransaction();
+      
+      const existingFund = await Fund.findById(fundId);
+      if (existingFund?.is_processed || existingFund?.stripe_transfer_id) {
+        return res.status(409).json({
+          success: false,
+          message: 'Payment already processed',
+          data: { transferId: existingFund.stripe_transfer_id }
+        });
+      }
+      
       return res.status(404).json({
         success: false,
-        message: 'Fund not found'
+        message: 'Fund not found or not in payable state'
+      });
+    }
+
+    if (fund.status === FUND_STATUS.RELEASED) {
+      await session.abortTransaction();
+      return res.status(409).json({
+        success: false,
+        message: 'Payment already released'
       });
     }
 
@@ -1286,48 +1324,87 @@ export const approvePayout = async (req, res) => {
       });
     }
 
+    const existingTransaction = await Transaction.findOne({
+      fund_id: fundId,
+      status: TRANSACTION_STATUS.COMPLETED
+    }).session(session);
+
+    if (existingTransaction) {
+      await session.abortTransaction();
+      return res.status(409).json({
+        success: false,
+        message: 'Transaction already exists',
+        data: { transactionId: existingTransaction._id }
+      });
+    }
+
+    
+
     const contractor = fund.contractor_id;
     const client = fund.client_id;
 
     const accountExists = await stripe.accounts.retrieve(contractor.stripeAccountId);
-    console.log('accountExists', accountExists);
-
-    // Check if account is ready for payouts
     if (!accountExists || accountExists.deleted) {
-      console.log('Contractor Stripe account does not exist or has been deleted');
+      await Fund.findByIdAndUpdate(fundId, {
+        is_processed: false,
+        status: FUND_STATUS.PENDING_REVIEW
+      }, { session });
+      
+      await session.abortTransaction();
       return res.status(400).json({
         success: false,
         message: 'Contractor Stripe account does not exist or has been deleted'
       });
     }
 
-    if (!accountExists.payouts_enabled) {
-      console.log('Contractor Stripe account is not enabled for payouts');
-      return res.status(400).json({
-        success: false,
-        message: 'Contractor account setup incomplete. Please complete your Stripe onboarding.',
-        requirements: accountExists.requirements.currently_due
-      });
-    }
-
     if (accountExists.capabilities.transfers !== 'active') {
-      console.log('Transfer capability not active');
+      await Fund.findByIdAndUpdate(fundId, {
+        is_processed: false,
+        status: FUND_STATUS.PENDING_REVIEW
+      }, { session });
+      
+      await session.abortTransaction();
       return res.status(400).json({
         success: false,
         message: 'Account not ready for transfers. Please complete verification.'
       });
     }
 
-    if (!contractor.stripeAccountId || !contractor.bankAccounts?.length) {
-      console.log('Contractor has incomplete payment setup');
+    if (!contractor.stripeAccountId) {
+      console.log('Contractor has no Stripe account ID');
       return res.status(400).json({
         success: false,
         message: 'Contractor has incomplete payment setup'
       });
     }
 
-    // Retrieve escrow account
-    const escrowAccount = await EscrowAccount.findOne({ client_id: client._id }).session(session);
+    const escrowAccount = await EscrowAccount.findOneAndUpdate(
+      {
+        client_id: client._id,
+        balance: { $gte: fund.amount }, // Ensure sufficient balance
+        frozen: false
+      },
+      {
+        $inc: {
+          balance: -fund.amount,
+          total_released: fund.amount
+        }
+      },
+      { new: true, session }
+    );
+
+    if (!escrowAccount) {
+      await Fund.findByIdAndUpdate(fundId, {
+        is_processed: false,
+        status: FUND_STATUS.PENDING_REVIEW
+      }, { session });
+      
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Insufficient escrow funds or account frozen'
+      });
+    }
 
     if (!escrowAccount) {
       console.log('Escrow account not found for client:', client._id);
@@ -1351,62 +1428,57 @@ export const approvePayout = async (req, res) => {
     const netAmountCents = Math.round(netAmount * 100);
     const feeCents = Math.round(platformFee * 100);
 
-    const payout = await stripe.payouts.create({
+
+    const transfer = await stripe.transfers.create({
       amount: netAmountCents,
       currency: fund.currency.toLowerCase(),
-      method: 'instant',
       destination: contractor.stripeAccountId,
       metadata: {
         fundId: fundId,
         jobId: fund.job_id._id.toString(),
         adminId: adminId,
-        platformFee: feeCents
+        platformFee: feeCents,
+        type: 'contractor_payment'
       }
     }, {
-      idempotencyKey: `payout-${fundId}-${Date.now()}`
+      idempotencyKey: idempotencyKey
     });
 
-    console.log('Payout created:', payout);
+    console.log('Transfer Created/Released: ', transfer);
+
+    await Fund.findByIdAndUpdate(fundId, {
+      $set: {
+        status: FUND_STATUS.RELEASED,
+        released_at: new Date(),
+        stripe_transfer_id: transfer.id,
+      }
+    }, { session });
 
     escrowAccount.balance = parseFloat((escrowAccount.balance - fund.amount).toFixed(2));
     escrowAccount.total_released = parseFloat((escrowAccount.total_released + fund.amount).toFixed(2));
     await escrowAccount.save({ session });
 
-    // Update fund status
-    fund.status = FUND_STATUS.RELEASED;
     fund.released_at = new Date();
     fund.admin_notes = `Approved by admin ${adminId} at ${new Date().toISOString()}`;
+    fund.status = FUND_STATUS.RELEASED;
     await fund.save({ session });
 
     const releaseTransaction = await Transaction.create([{
       fund_id: fund._id,
-      type: TRANSACTION_TYPE.RELEASE,
       amount: fund.amount,
       currency: fund.currency,
-      initiated_by: adminId,
       status: TRANSACTION_STATUS.COMPLETED,
-      notes: `Payout to ${contractor.name}. Net: ${netAmount} ${fund.currency}`,
-      external_transaction_id: payout.id,
+      notes: `Transfer to contractor. Net: ${netAmount} ${fund.currency}`,
+      external_transaction_id: transfer.id,
       fee_amount: platformFee,
-      net_amount: netAmount,
-      timestamp: new Date()
+      userId: fund.contractor_id._id
     }], { session });
 
-    console.log('Release transaction created:', releaseTransaction);
 
-    await Transaction.create([{
-      type: TRANSACTION_TYPE.PLATFORM_FEE,
-      amount: platformFee,
-      currency: fund.currency,
-      initiated_by: adminId,
-      status: TRANSACTION_STATUS.COMPLETED,
-      notes: `Platform fee for payout ${payout.id}`,
-      external_transaction_id: `fee_${payout.id}`,
-      timestamp: new Date()
-    }], { session });
-
-    // Update job status if all milestones are paid
-    const jobMilestones = await Fund.find({ job_id: fund.job_id._id });
+    const jobMilestones = await Fund.find({ 
+      job_id: fund.job_id._id 
+    }).session(session);
+    
     const allMilestonesPaid = jobMilestones.every(m =>
       m.status === FUND_STATUS.RELEASED
     );
@@ -1421,13 +1493,13 @@ export const approvePayout = async (req, res) => {
 
     await session.commitTransaction();
 
-    console.log('Payout approved successfully:', payout);
+    console.log('Transfer approved successfully:', transfer);
 
     res.status(200).json({
       success: true,
-      message: 'Payout approved successfully',
+      message: 'Transfer approved successfully',
       data: {
-        payoutId: payout.id,
+        transferId: transfer.id,
         netAmount,
         platformFee,
         currency: fund.currency,
@@ -1438,9 +1510,8 @@ export const approvePayout = async (req, res) => {
   } catch (error) {
     await session.abortTransaction();
 
-    console.error('Payout approval failed:', error);
+    console.error('Transfer approval failed:', error);
 
-    // Handle Stripe errors specifically
     if (error.type === 'StripeAPIError' || error.type === 'StripeConnectionError') {
       return res.status(502).json({
         success: false,
@@ -1451,10 +1522,39 @@ export const approvePayout = async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Payout approval failed',
+      message: 'Transfer approval failed',
       error: error.message
     });
   } finally {
     session.endSession();
   }
 };
+
+
+export const preventConcurrentProcessing = async (req, res, next) => {
+  const fundId = req.params.id;
+  const lockKey = `processing_${fundId}`;
+  
+  // Using Redis would be better, but for now we can use MongoDB
+  const lock = await Lock.findOneAndUpdate(
+    { key: lockKey },
+    { 
+      $set: { 
+        expires_at: new Date(Date.now() + 30000), // 30 second lock
+        created_at: new Date() 
+      }
+    },
+    { upsert: true, new: true }
+  );
+  
+  if (lock.created_at < new Date(Date.now() - 30000)) {
+    return res.status(423).json({
+      success: false,
+      message: 'Another request is currently processing this fund'
+    });
+  }
+  
+  req.lockKey = lockKey;
+  next();
+};
+

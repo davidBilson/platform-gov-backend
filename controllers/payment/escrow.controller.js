@@ -65,7 +65,7 @@ export const createEscrowForFundedProject = async (jobId, userId) => {
     const fund = new Fund({
       job_id: job._id,
       client_id: client._id,
-      freelancer_id: job.freelancerId?._id || null,
+      contractor_id: job.freelancerId?._id || null,
       amount: escrowAmount,
       currency: 'usd',
       status: 'available'
@@ -122,7 +122,7 @@ export const createEscrowForFundedProject = async (jobId, userId) => {
         type: TRANSACTION_TYPE.RELEASE,
         amount: fund.amount,
         currency: fund.currency,
-        initiated_by: fund.freelancer_id,
+        initiated_by: fund.contractor_id,
         status: TRANSACTION_STATUS.PENDING,
         notes: 'Withdrawal requested by freelancer'
       });
@@ -170,7 +170,7 @@ export const createEscrowForFundedProject = async (jobId, userId) => {
           await fund.save();
           
           // Payout to freelancer (using your existing Stripe logic)
-          const freelancer = await User.findById(fund.freelancer_id);
+          const freelancer = await User.findById(fund.contractor_id);
           const payout = await stripe.payouts.create({
             amount: Math.round(transaction.amount * 100),
             currency: fund.currency,
