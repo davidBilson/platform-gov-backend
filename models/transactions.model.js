@@ -17,8 +17,8 @@ const TransactionSchema = new mongoose.Schema({
     enum: [
       'payment_method_added',
       'project_funding',
-      'payout_pending',
-      'payout',
+      'payout_pending', //Funds in 5-day hold
+      'payout', // Funds withdrawn
       'refund',
       'dispute'
     ],

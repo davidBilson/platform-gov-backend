@@ -6,8 +6,10 @@ const FUND_STATUS = {
   AVAILABLE: 'available',
   IN_PROGRESS: 'in_progress',
   PENDING_REVIEW: 'pending_review',
+  PENDING_RELEASE: 'pending_release',
   IN_REVIEW: 'in_review',
   RELEASED: 'released',
+  WITHDRAWN: 'withdrawn',
   IN_DISPUTE: 'in_dispute'
 };
 
@@ -60,6 +62,7 @@ const fundSchema = new Schema({
     default: false,
     index: true
   },
+  available_after: Date,
   
   processing_attempts: {
     type: Number,
