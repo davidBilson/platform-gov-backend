@@ -5,6 +5,7 @@ import { Message } from '../models/messaging.system.model.js';
 import Hiring from '../models/hiring.model.js';
 import Contract from '../models/contract.model.js';
 import JobApplication from '../models/job.applications.model.js';
+import Job from '../models/job.created.model.js';
 
 const createNotification = async (io, { userId, title, message, type, link = null }) => {
   try {

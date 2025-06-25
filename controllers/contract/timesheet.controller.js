@@ -222,7 +222,7 @@ export const stopWorkSession = async (req, res) => {
     
     // Add additional metadata
     session.updatedAt = new Date();
-    session.screenshotCount = screenshotUploads.length;
+    // session.screenshotCount = screenshotUploads.length;
     
     await contract.save();
     console.log('Session updated successfully with', screenshotUploads.length, 'screenshots');

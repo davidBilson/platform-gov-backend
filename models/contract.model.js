@@ -20,7 +20,10 @@ const contractSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   },
-  
+  totalEarnings: {
+    type: Number,
+    min: 0,
+  },
   startDate: {
     type: Date,
     default: Date.now
@@ -126,8 +129,6 @@ const contractSchema = new mongoose.Schema({
       type: Number,
       min: 0
     },
-    
-    // Approval tracking
     approvedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User'

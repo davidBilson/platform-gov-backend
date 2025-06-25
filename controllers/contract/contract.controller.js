@@ -1,5 +1,6 @@
 import ClientProfile from '../../models/profile.client.model.js';
 import Contract from '../../models/contract.model.js';
+import Job from '../../models/job.created.model.js';
 import Hiring from '../../models/hiring.model.js';
 
 export const createContract = async (req, res) => {
@@ -226,21 +227,75 @@ export const getContracts = async (req, res) => {
   }
 };
 
+const calculateTotalEarnings = async (contract) => {
+  let totalEarnings = 0;
+
+  // Get the job details for rate information
+  const job = await Job.findById(contract.jobId);
+  if (!job) {
+    throw new Error('Associated job not found');
+  }
+
+  switch (contract.paymentStructure) {
+    case 'milestone':
+      // Sum up all completed milestones
+      const completedMilestones = contract.milestones?.filter(
+        milestone => milestone.status === 'completed' || milestone.status === 'approved' || milestone.status === 'paid'
+      ) || [];
+      
+      totalEarnings = completedMilestones.reduce((sum, milestone) => {
+        return sum + (milestone.amount || 0);
+      }, 0);
+      break;
+
+    case 'timesheet':
+      // Calculate total hours worked multiplied by hourly rate
+      const approvedTimesheets = contract.timesheets?.filter(
+        timesheet => timesheet.status === 'approved' || timesheet.status === 'paid'
+      ) || [];
+      
+      totalEarnings = approvedTimesheets.reduce((sum, timesheet) => {
+        const hours = timesheet.duration || 0; // duration should be in hours
+        const rate = timesheet.rate || job.price || 0; // use timesheet rate or job price
+        return sum + (hours * rate);
+      }, 0);
+      break;
+
+    case 'retainer':
+      // Sum up all completed retainer payments
+      const completedPayments = contract.retainer?.paymentHistory?.filter(
+        payment => payment.status === 'completed'
+      ) || [];
+      
+      totalEarnings = completedPayments.reduce((sum, payment) => {
+        return sum + (payment.amount || 0);
+      }, 0);
+      break;
+
+    default:
+      totalEarnings = 0;
+      break;
+  }
+
+  return totalEarnings;
+};
+
 export const endContract = async (req, res) => {
   try {
-
     const { contractId } = req.params;
     const userId = req.body.userId;
 
-    if (!contractId || !userId){
-      TodayInstance.error('Incomplete credentials')
-      return;
+    if (!contractId || !userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Contract ID and User ID are required'
+      });
     }
 
     const contract = await Contract.findOne({
       _id: contractId,
       $or: [{ clientId: userId }, { contractorId: userId }]
-    });
+    }).populate('jobId');
 
     if (!contract) {
       return res.status(404).json({
@@ -263,6 +318,18 @@ export const endContract = async (req, res) => {
       });
     }
 
+    // Validate earnings amount
+    const overAllEarnings = await calculateTotalEarnings(contract);
+    
+    if (overAllEarnings < 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Contract earnings cannot be negative" 
+      });
+    }
+
+    // Update contract with calculated earnings
+    contract.totalEarnings = overAllEarnings;
     contract.status = 'completed';
     contract.endDate = new Date();
     await contract.save();
@@ -270,7 +337,8 @@ export const endContract = async (req, res) => {
     res.status(200).json({
       success: true,
       data: contract,
-      message: 'Contract ended successfully'
+      message: 'Contract ended successfully',
+      totalEarnings: overAllEarnings
     });
 
   } catch (error) {

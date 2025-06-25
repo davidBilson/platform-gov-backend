@@ -3,20 +3,17 @@ import {
     savePaymentMethod,
     getTransactionHistory,
     getUserPaymentMethods,
-    fundProject,
     deletePaymentMethod,
     updateDefaultPaymentMethod,
     getPlatformFee,
     saveBankAccount,
     getPayoutMethods,
     createFreelancerAccount,
-    releaseFunds,
     getPendingPayouts,
-    approvePayout,
     createOnboardingLink,
     getAccountStatus,
-    withdrawFunds
 } from '../controllers/payment/payment.controller.js';
+import { fundProject, getClientFunds, getContractorFunds, getWithdrawableFunds, releaseFunds, withdrawFunds } from '../controllers/payment/allFunds.controller.js';
 
 const router = express.Router();
 
@@ -26,15 +23,17 @@ router.get('/get-transaction-history/:id', getTransactionHistory)
 router.get('/get-payout-methods/:id', getPayoutMethods);
 router.get('/get-pending-payouts/:id', getPendingPayouts);
 router.get('/get-account-status/:id', getAccountStatus);
+router.get('/get-withdrawable-funds/:id', getWithdrawableFunds);
+router.get('/get-contractor-funds/:id', getContractorFunds);
+router.get('/get-client-funds/:id', getClientFunds);
 
 router.post('/save-payment-method', savePaymentMethod);
 router.post('/fund-project', fundProject);
 router.post('/save-bank-account', saveBankAccount);
 router.post('/create-freelancer-account', createFreelancerAccount);
 router.post('/release-funds', releaseFunds);
-router.post('/withdraw-funds', withdrawFunds);
-router.post('/approve-payout/:id', approvePayout);
 router.post('/create-onboarding-link/:id', createOnboardingLink)
+router.post('/withdraw-funds/:id', withdrawFunds);
 
 router.put('/update-payment-method', updateDefaultPaymentMethod);
 

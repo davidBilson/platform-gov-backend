@@ -1,14 +1,15 @@
 import mongoose from 'mongoose';
+import { type } from 'os';
 const { Schema } = mongoose;
 
 // Enums for better type safety and validation
 const FUND_STATUS = {
-  AVAILABLE: 'available',
-  IN_PROGRESS: 'in_progress',
-  PENDING_REVIEW: 'pending_review',
-  PENDING_RELEASE: 'pending_release',
+  IN_ESCROW: 'in_escrow', //state 1
+  PENDING: 'pending', // state 2
+  AVAILABLE: 'available', //state 3
+
+  
   IN_REVIEW: 'in_review',
-  RELEASED: 'released',
   WITHDRAWN: 'withdrawn',
   IN_DISPUTE: 'in_dispute'
 };
@@ -75,6 +76,10 @@ const fundSchema = new Schema({
     sparse: true,
     unique: true
   },
+  withdrawableAmount: {
+    type: Number,
+    min: 0
+  },
   amount: {
     type: Number,
     required: true,
@@ -97,7 +102,7 @@ const fundSchema = new Schema({
     type: String,
     required: true,
     enum: Object.values(FUND_STATUS),
-    default: FUND_STATUS.AVAILABLE,
+    default: FUND_STATUS.IN_ESCROW,
     index: true
   },
   due_date: {
