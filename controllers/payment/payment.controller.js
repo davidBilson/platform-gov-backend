@@ -359,7 +359,7 @@ export const getPendingPayouts = async (req, res) => {
               paymentStructure: contract.paymentStructure,
               milestonesCount: contract.milestones ? contract.milestones.length : 0,
               completedMilestones: contract.milestones ?
-                contract.milestones.filter(m => m.status === 'completed').length : 0,
+                contract.milestones.filter(m => m.status === 'approved').length : 0,
               timesheetsCount: contract.timesheets ? contract.timesheets.length : 0,
               hasRetainer: !!contract.retainer,
               createdAt: contract.createdAt

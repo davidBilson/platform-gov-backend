@@ -40,6 +40,7 @@ const CURRENCY_CODES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'NGN'];
 // ========================================
 // 1. FUNDS SCHEMA
 // ========================================
+
 const fundSchema = new Schema({
   job_id: {
     type: Schema.Types.ObjectId,
