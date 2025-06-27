@@ -1,9 +1,11 @@
+import Withdrawal from '../../models/withdrawal.model.js';
 import Transactions from '../../models/transactions.model.js';
 import User from '../../models/user.model.js';
 import Job from '../../models/job.created.model.js';
 import Stripe from 'stripe';
 import { Fund, Transaction as EscrowTransaction, FUND_STATUS } from '../../models/escrow.model.js';
 import Contract from '../../models/contract.model.js';
+import cron from 'node-cron';
 
 import { createEscrowForFundedProject } from './escrow.controller.js';
 import mongoose from 'mongoose';
@@ -48,7 +50,7 @@ export const fundProject = async (req, res) => {
             });
         }
 
-        if (job.status !== 'open' || job.isFunded) {
+        if (job.isFunded) {
             return res.status(200).json({
                 success: false,
                 message: 'Job has already been funded!'
@@ -149,7 +151,7 @@ export const fundProject = async (req, res) => {
         });
 
         try {
-            await createEscrowForFundedProject(jobId, userId)
+            await createEscrowForFundedProject(jobId, userId, amount);
         } catch (error) {
             console.error('Escrow creation failed:', error);
         }
@@ -191,31 +193,36 @@ export const fundProject = async (req, res) => {
 
 export const releaseFunds = async (req, res) => {
     try {
-        const { contractId, userId } = req.body;
-        console.log('Release funds request body: ', contractId, userId)
+        const { contractId, userId, amount: releaseAmount } = req.body;
+        console.log('Release funds request:', { contractId, userId, releaseAmount });
+        
         const contract = await Contract.findById(contractId)
             .populate('jobId')
             .populate('contractorId', 'stripeAccountId');
 
         if (!contract) return res.status(404).json({ success: false, message: 'Contract not found' });
         if (contract.clientId.toString() !== userId.toString()) {
-            console.log('Only contract client can release funds')
             return res.status(403).json({ success: false, message: 'Only contract client can release funds' });
         }
         if (contract.status !== 'completed') {
-            console.log('Contract must be completed to release funds')
             return res.status(400).json({ success: false, message: 'Contract must be completed to release funds' });
         }
 
-        const fund = await Fund.findOne({ job_id: contract.jobId._id });
+        const fund = await Fund.findOne({ jobId: contract.jobId._id });
         if (!fund) return res.status(404).json({ success: false, message: 'Fund not found' });
-        if (fund.status !== FUND_STATUS.AVAILABLE) {
-            return res.status(400).json({ success: false, message: 'Funds are not available for release' });
-        }
-        if (contract.totalEarnings > fund.amount) return res.status(400).json({ success: false, message: "Contract earnings exceed available fund amount" });
         
-        const platformFee = contract.totalEarnings * 0.05;
-        const netAmount = contract.totalEarnings - platformFee;
+        // Determine release amount - use provided amount or total contract earnings
+        const amountToRelease = releaseAmount || contract.totalEarnings;
+        
+        if (fund.in_escrow.amount < amountToRelease) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Insufficient funds in escrow for this release' 
+            });
+        }
+        
+        const platformFee = amountToRelease * 0.05;
+        const netAmount = amountToRelease - platformFee;
 
         // Create transfer to contractor's Stripe account
         const transfer = await stripe.transfers.create({
@@ -226,15 +233,29 @@ export const releaseFunds = async (req, res) => {
                 jobId: contract.jobId._id.toString(),
                 contractId: contractId,
                 clientId: userId,
-                contractorId: contract.contractorId._id.toString()
+                contractorId: contract.contractorId._id.toString(),
+                releaseAmount: amountToRelease.toString()
             }
         });
 
-        fund.withdrawableAmount = netAmount ?? 0;
-        fund.amount = fund.amount - contract.totalEarnings; // that is how much is left after payout to contractor
-        fund.status = FUND_STATUS.PENDING;
+        // Validate and set available_after date
+        let availableAfterDate;
+        if (transfer.available_on && typeof transfer.available_on === 'number') {
+            availableAfterDate = new Date(transfer.available_on * 1000);
+            if (isNaN(availableAfterDate.getTime())) {
+                console.warn('Invalid available_on timestamp from Stripe:', transfer.available_on);
+                availableAfterDate = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
+            }
+        } else {
+            console.warn('No available_on field in Stripe transfer response, using default');
+            availableAfterDate = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
+        }
+
+        // Update fund using new schema methods
+        fund.releaseFromEscrow(amountToRelease);
         fund.stripe_transfer_id = transfer.id;
-        fund.available_after = new Date(transfer.available_on * 1000); // Convert to milliseconds
+        fund.available_after = availableAfterDate;
+        fund.contractorId = contract.contractorId._id;
         await fund.save();
 
         // Create transaction record
@@ -246,14 +267,17 @@ export const releaseFunds = async (req, res) => {
             status: 'pending',
             paymentMethod: 'escrow',
             stripeTransferId: transfer.id,
-            description: `Funds released - available on ${new Date(transfer.available_on * 1000).toDateString()}`
+            description: `Funds released - available on ${availableAfterDate.toDateString()}`
         });
-
+        
+        console.log('Funds released to contractor, awaiting stripe processing');
         res.status(200).json({
             success: true,
             message: 'Funds released to contractor. Awaiting Stripe processing.',
             transferId: transfer.id,
-            availableOn: new Date(transfer.available_on * 1000)
+            availableOn: availableAfterDate,
+            amountReleased: amountToRelease,
+            netAmount: netAmount
         });
 
     } catch (error) {
@@ -266,44 +290,54 @@ export const releaseFunds = async (req, res) => {
     }
 };
 
-// Track payout availability (to be run periodically via cron job)
+
+// Extract the core logic into a separate function
+const processPayoutAvailability = async () => {
+    const now = new Date();
+    const fundsToUpdate = await Fund.find({
+        'pending.amount': { $gt: 0 },
+        available_after: { $lte: now }
+    });
+
+    if (fundsToUpdate.length === 0) {
+        return {
+            success: true,
+            message: 'No funds to update at this time.',
+            count: 0
+        };
+    }
+
+    const updatePromises = fundsToUpdate.map(async (fund) => {
+        const pendingAmount = fund.pending.amount;
+        fund.makePendingAvailable(pendingAmount);
+        await fund.save();
+
+        await Transactions.create({
+            userId: fund.contractorId,
+            jobId: fund.jobId,
+            type: 'payout_available',
+            amount: pendingAmount,
+            status: 'completed',
+            paymentMethod: 'escrow',
+            description: `Funds now available for withdrawal`
+        });
+    });
+
+    await Promise.all(updatePromises);
+
+    console.log('funds updated to available');
+    return {
+        success: true,
+        message: `${fundsToUpdate.length} funds updated to available.`,
+        count: fundsToUpdate.length
+    };
+};
+
+// Express route handler
 export const trackPayoutAvailability = async (req, res) => {
     try {
-        const now = new Date();
-        const fundsToUpdate = await Fund.find({
-            status: FUND_STATUS.PENDING,
-            available_after: { $lte: now }
-        });
-
-        if (fundsToUpdate.length === 0) {
-            return res.status(200).json({
-                success: true,
-                message: 'No funds to update at this time.'
-            });
-        }
-
-        const updatePromises = fundsToUpdate.map(async (fund) => {
-            fund.status = FUND_STATUS.AVAILABLE;
-            await fund.save();
-
-            await Transactions.create({
-                userId: fund.contractor_id,
-                jobId: fund.job_id,
-                type: 'payout_available',
-                amount: fund.amount,
-                status: 'completed',
-                paymentMethod: 'escrow',
-                description: `Funds now available for withdrawal`
-            });
-        });
-
-        await Promise.all(updatePromises);
-
-        res.status(200).json({
-            success: true,
-            message: `${fundsToUpdate.length} funds updated to available.`
-        });
-
+        const result = await processPayoutAvailability();
+        res.status(200).json(result);
     } catch (error) {
         console.error('Error tracking payout availability:', error);
         res.status(500).json({
@@ -313,6 +347,16 @@ export const trackPayoutAvailability = async (req, res) => {
         });
     }
 };
+
+// Cron job - now calls the extracted function
+cron.schedule('0 * * * *', async () => {
+    try {
+        const result = await processPayoutAvailability();
+        console.log(`Cron job completed: ${result.message}`);
+    } catch (error) {
+        console.error('Cron job failed:', error);
+    }
+});
 
 export const getWithdrawableFunds = async (req, res) => {
     try {
@@ -326,11 +370,11 @@ export const getWithdrawableFunds = async (req, res) => {
             });
         }
 
-        // Find all released funds for this contractor
+        // Find all funds with available amounts for this contractor
         const funds = await Fund.find({
-            contractor_id: userId,
-            status: FUND_STATUS.AVAILABLE
-        }).populate('job_id', 'jobTitle');
+            contractorId: userId,
+            'available.amount': { $gt: 0 }
+        }).populate('jobId', 'jobTitle');
 
         if (!funds || funds.length === 0) {
             return res.status(200).json({
@@ -343,16 +387,16 @@ export const getWithdrawableFunds = async (req, res) => {
         }
 
         // Calculate total amount
-        const totalAmount = funds.reduce((sum, fund) => sum + fund.withdrawableAmount, 0);
+        const totalAmount = funds.reduce((sum, fund) => sum + fund.available.amount, 0);
 
         // Format response
         const formattedFunds = funds.map(fund => ({
             fundId: fund._id.toString(),
-            jobId: fund.job_id._id.toString(),
-            jobTitle: fund.job_id.jobTitle || 'Untitled Job',
-            amount: Number(fund.withdrawableAmount),
+            jobId: fund.jobId._id.toString(),
+            jobTitle: fund.jobId.jobTitle || 'Untitled Job',
+            amount: Number(fund.available.amount),
             currency: fund.currency || 'USD',
-            releasedAt: fund.released_at || fund.updatedAt
+            availableAt: fund.available.date
         }));
 
         res.status(200).json({
@@ -375,212 +419,333 @@ export const getWithdrawableFunds = async (req, res) => {
 
 export const getContractorFunds = async (req, res) => {
     try {
-      const contractorId = req.params.id;
-      
-      const funds = await Fund.find({ contractor_id: contractorId })
-        .populate('job_id', 'jobTitle')
-        .populate('client_id', 'name');
-  
-      const categorizedFunds = {
-        available: [],
-        in_review: [],
-        pending: [],
-        withdrawn: []
-      };
-  
-      funds.forEach(fund => {
-        const fundData = {
-          id: fund._id,
-          jobId: fund.job_id._id,
-          jobTitle: fund.job_id.jobTitle,
-          clientName: fund.client_id.name,
-          amount: fund.withdrawableAmount,
-          createdAt: fund.created_at,
-          availableAfter: fund.available_after,
-          withdrawnAt: fund.withdrawn_at
-        };
-  
-        switch(fund.status) {
-          case FUND_STATUS.AVAILABLE:
-            categorizedFunds.available.push(fundData);
-            break;
-          case FUND_STATUS.IN_REVIEW:
-            categorizedFunds.in_review.push(fundData);
-            break;
-          case FUND_STATUS.PENDING:
-            categorizedFunds.pending.push(fundData);
-            break;
-          case FUND_STATUS.WITHDRAWN:
-            categorizedFunds.withdrawn.push(fundData);
-            break;
+        const contractorId = req.params.id;
+
+        if (!mongoose.Types.ObjectId.isValid(contractorId)) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Invalid contractor ID format' 
+            });
         }
-      });
-  
-      res.status(200).json({ success: true, funds: categorizedFunds });
+
+        const contractorObjectId = new mongoose.Types.ObjectId(contractorId);
+        
+        const contractor = await User.findById(contractorObjectId);
+        
+        if (!contractor) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Contractor not found' 
+            });
+        }
+
+        let stripeBalance = null;
+        
+        if (contractor.stripeAccountId) {
+            try {
+                
+                const balance = await stripe.balance.retrieve({
+                    stripeAccount: contractor.stripeAccountId
+                });
+                
+                stripeBalance = {
+                    available: balance.available,
+                    pending: balance.pending,
+                    connect_reserved: balance.connect_reserved || [],
+                    instant_available: balance.instant_available || []
+                };
+                
+                // Log totals in a more readable format
+                const availableTotal = balance.available.reduce((sum, bal) => sum + bal.amount, 0);
+                const pendingTotal = balance.pending.reduce((sum, bal) => sum + bal.amount, 0);
+                
+                console.log(`Stripe Available Total: ${availableTotal / 100} ${balance.available[0]?.currency || 'USD'}`);
+                console.log(`Stripe Pending Total: ${pendingTotal / 100} ${balance.pending[0]?.currency || 'USD'}`);
+                
+            } catch (stripeError) {
+                console.error('Error retrieving Stripe balance:', stripeError.message);
+                // Don't fail the entire request if Stripe balance check fails
+                stripeBalance = { error: stripeError.message };
+            }
+        } else {
+            console.log('No Stripe account ID found for contractor');
+        }
+
+        // Query funds with proper error handling
+        const funds = await Fund.find({ contractorId: contractorObjectId })
+            .populate('jobId', 'jobTitle title')
+            .populate('clientId', 'name firstName lastName')
+            .lean();
+
+        const categorizedFunds = {
+            available: [],
+            pending: [],
+            disputed: [], // shown as "in review" on frontend
+            withdrawn: []
+        };
+
+        funds.forEach(fund => {
+            const jobTitle = fund.jobId?.jobTitle || fund.jobId?.title || 'Unknown Job';
+            const clientName = fund.clientId?.name || 
+                             `${fund.clientId?.firstName || ''} ${fund.clientId?.lastName || ''}`.trim() || 
+                             'Unknown Client';
+
+            const baseFundData = {
+                id: fund._id,
+                jobId: fund.jobId?._id || fund.jobId,
+                jobTitle: jobTitle,
+                clientName: clientName,
+                createdAt: fund.created_at || fund.createdAt
+            };
+
+            if (fund.available && fund.available.amount > 0) {
+                categorizedFunds.available.push({
+                    ...baseFundData,
+                    amount: fund.available.amount,
+                    availableDate: fund.available.date
+                });
+            }
+
+            if (fund.pending && fund.pending.amount > 0) {
+                categorizedFunds.pending.push({
+                    ...baseFundData,
+                    amount: fund.pending.amount,
+                    pendingDate: fund.pending.date,
+                    availableAfter: fund.available_after
+                });
+            }
+
+            if (fund.disputed && fund.disputed.amount > 0) {
+                categorizedFunds.disputed.push({
+                    ...baseFundData,
+                    amount: fund.disputed.amount,
+                    disputedDate: fund.disputed.date
+                });
+            }
+        });
+
+        const totals = {
+            available: categorizedFunds.available.reduce((sum, f) => sum + f.amount, 0),
+            pending: categorizedFunds.pending.reduce((sum, f) => sum + f.amount, 0),
+            disputed: categorizedFunds.disputed.reduce((sum, f) => sum + f.amount, 0)
+        };
+
+        res.status(200).json({ 
+            success: true, 
+            funds: categorizedFunds,
+            totals: totals, // Include totals for debugging
+            totalFunds: funds.length,
+            stripeBalance: stripeBalance // Include Stripe balance in response
+        });
+        
     } catch (error) {
-      console.error('Error getting contractor funds:', error);
-      res.status(500).json({ success: false, message: 'Error retrieving funds' });
+        console.error('Error getting contractor funds:', error);
+        console.error('Error stack:', error.stack);
+        
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error retrieving funds',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
     }
-  };
+};
   
-  export const getClientFunds = async (req, res) => {
+export const getClientFunds = async (req, res) => {
     try {
       const clientId = req.params.id;
       
-      const funds = await Fund.find({ client_id: clientId })
-        .populate('job_id', 'jobTitle')
-        .populate('contractor_id', 'name');
-  
+      const funds = await Fund.find({ clientId: clientId })
+        .populate('jobId', 'jobTitle')
+        .populate('contractorId', 'name');
+
       const categorizedFunds = {
         in_escrow: [],
-        released: []
+        released: [],
+        disputed: []
       };
-  
+
       funds.forEach(fund => {
-        const fundData = {
+        const baseFundData = {
           id: fund._id,
-          jobId: fund.job_id._id,
-          jobTitle: fund.job_id.jobTitle,
-          contractorName: fund.contractor_id?.name || 'Unknown',
-          amount: fund.amount,
-          createdAt: fund.created_at,
-          releasedAt: fund.released_at
+          jobId: fund.jobId._id,
+          jobTitle: fund.jobId.jobTitle,
+          contractorName: fund.contractorId?.name || 'Unknown',
+          createdAt: fund.created_at
         };
-  
-        // For client: in_escrow = funds still in escrow or in review
-        if ([FUND_STATUS.IN_ESCROW, FUND_STATUS.IN_REVIEW].includes(fund.status)) {
-          categorizedFunds.in_escrow.push(fundData);
-        } 
-        // For client: released = funds that have been released (pending/available/withdrawn)
-        else if ([FUND_STATUS.PENDING, FUND_STATUS.AVAILABLE, FUND_STATUS.WITHDRAWN].includes(fund.status)) {
-          categorizedFunds.released.push(fundData);
+
+        // Funds still in escrow
+        if (fund.in_escrow.amount > 0) {
+          categorizedFunds.in_escrow.push({
+            ...baseFundData,
+            amount: fund.in_escrow.amount,
+            escrowDate: fund.in_escrow.date
+          });
+        }
+
+        // Released funds
+        if (fund.released.amount > 0) {
+          categorizedFunds.released.push({
+            ...baseFundData,
+            amount: fund.released.amount,
+            releasedDate: fund.released.date
+          });
+        }
+
+        // Disputed funds
+        if (fund.disputed.amount > 0) {
+          categorizedFunds.disputed.push({
+            ...baseFundData,
+            amount: fund.disputed.amount,
+            disputedDate: fund.disputed.date
+          });
         }
       });
-  
+
       res.status(200).json({ success: true, funds: categorizedFunds });
     } catch (error) {
       console.error('Error getting client funds:', error);
       res.status(500).json({ success: false, message: 'Error retrieving funds' });
     }
-  };
+};
+
 
 export const withdrawFunds = async (req, res) => {
-    const session = await mongoose.startSession();
-    session.startTransaction();
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
+  try {
+    const userId = req.params.id;
+    const amount = parseFloat(req.query.amount);
 
-    try {
-        const { fundId } = req.query;
-        const userId = req.params.id;
-
-        if (!fundId) {
-            await session.abortTransaction();
-            return res.status(400).json({ success: false, message: 'Fund ID is required' });
-        }
-
-        const fund = await Fund.findOne({
-            _id: fundId,
-            contractor_id: userId,
-            status: FUND_STATUS.AVAILABLE
-        }).populate('job_id', 'jobTitle').session(session);
-
-        if (!fund) {
-            await session.abortTransaction();
-            return res.status(404).json({ success: false, message: 'Fund not available for withdrawal' });
-        }
-
-        const contractor = await User.findById(userId).session(session);
-        if (!contractor) {
-            await session.abortTransaction();
-            return res.status(404).json({ success: false, message: 'Contractor not found' });
-        }
-
-        // Check if contractor has connected bank account
-        if (!contractor.bankAccounts || contractor.bankAccounts.length === 0) {
-            await session.abortTransaction();
-            return res.status(400).json({
-                success: false,
-                message: 'No bank account found. Please add a bank account first.'
-            });
-        }
-
-        // Retrieve Stripe balance
-        const balance = await stripe.balance.retrieve({
-            stripeAccount: contractor.stripeAccountId
-        });
-
-        // Find USD available balance
-        const usdBalance = balance.available.find(b => b.currency === 'usd');
-        const availableBalance = usdBalance ? usdBalance.amount / 100 : 0;
-
-        // Check if balance meets minimum requirement
-        if (availableBalance < 50) {
-            await session.abortTransaction();
-            return res.status(400).json({
-                success: false,
-                message: `Insufficient balance for withdrawal. Minimum required: $50. Available: $${availableBalance}`
-            });
-        }
-
-        const defaultBankAccount = contractor.bankAccounts.find(acc => acc.isDefault) || contractor.bankAccounts[0];
-        const amountInCents = Math.round(fund.withdrawableAmount * 100);
-
-        // Create payout
-        const payout = await stripe.payouts.create({
-            amount: amountInCents,
-            currency: 'usd',
-            destination: defaultBankAccount.id,
-            metadata: { fundId: fundId }
-        }, { stripeAccount: contractor.stripeAccountId });
-
-        // Update fund status
-        fund.status = FUND_STATUS.WITHDRAWN;
-        fund.stripe_payout_id = payout.id;
-        fund.withdrawn_at = new Date();
-        await fund.save({ session });
-
-        // Create transaction record
-        const transaction = await Transactions.create([{
-            userId: userId,
-            jobId: fund.job_id._id,
-            type: 'payout',
-            amount: fund.withdrawableAmount,
-            status: 'completed',
-            paymentMethod: 'bank_account',
-            stripePayoutId: payout.id,
-            description: `Withdrawal for job: ${fund.job_id.jobTitle}`,
-            createdAt: new Date()
-        }], { session });
-
-        await session.commitTransaction();
-
-        res.status(200).json({
-            success: true,
-            message: 'Funds withdrawn successfully',
-            payoutId: payout.id,
-            amount: fund.withdrawableAmount,
-            estimatedArrival: new Date(payout.arrival_date * 1000),
-            transactionId: transaction[0]._id
-        });
-
-    } catch (error) {
-        await session.abortTransaction();
-        console.error('Withdrawal failed:', error);
-
-        let userMessage = 'Withdrawal failed. Please try again.';
-        if (error.type === 'StripeInvalidRequestError') {
-            userMessage = error.message;
-        } else if (error.code === 'insufficient_funds') {
-            userMessage = 'Insufficient funds in your Stripe account.';
-        }
-
-        res.status(400).json({
-            success: false,
-            message: userMessage,
-            error: error.message
-        });
-    } finally {
-        await session.endSession();
+    if (!amount || isNaN(amount) || amount <= 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid withdrawal amount' 
+      });
     }
+
+    // 1. Check total available funds
+    const totalFunds = await Fund.aggregate([
+      { $match: { contractorId: new mongoose.Types.ObjectId(userId) } },
+      { $group: { _id: null, total: { $sum: "$available.amount" } } }
+    ]).session(session);
+
+    const availableBalance = totalFunds[0]?.total || 0;
+    
+    if (availableBalance < amount) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Insufficient funds' 
+      });
+    }
+
+    // 2. Check Stripe balance
+    const user = await User.findById(userId).session(session);
+    if (!user.stripeAccountId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Stripe account not set up' 
+      });
+    }
+
+    const balance = await stripe.balance.retrieve({
+      stripeAccount: user.stripeAccountId
+    });
+    
+    const stripeBalance = balance.available.reduce(
+      (sum, bal) => bal.currency === 'usd' ? sum + bal.amount : sum, 0
+    ) / 100;
+
+    if (stripeBalance < amount) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Insufficient Stripe balance' 
+      });
+    }
+
+    // 3. Find bank account
+    const bankAccount = user.bankAccounts.find(acc => acc.isDefault) || user.bankAccounts[0];
+    if (!bankAccount) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'No bank account found' 
+      });
+    }
+
+    // 4. Create payout
+    const payout = await stripe.payouts.create({
+      amount: Math.round(amount * 100),
+      currency: 'usd',
+      destination: bankAccount.id,
+      metadata: { userId }
+    }, { stripeAccount: user.stripeAccountId });
+
+    // 5. Deduct funds from available balance (oldest first)
+    const funds = await Fund.find({
+      contractorId: userId,
+      "available.amount": { $gt: 0 }
+    })
+    .sort({ "available.date": 1 })
+    .session(session);
+
+    let remaining = amount;
+    for (const fund of funds) {
+      if (remaining <= 0) break;
+      
+      const deductAmount = Math.min(remaining, fund.available.amount);
+      fund.available.amount -= deductAmount;
+      remaining = parseFloat((remaining - deductAmount).toFixed(2));
+      
+      await fund.save({ session });
+    }
+
+    // 6. Record withdrawal
+    const withdrawal = new Withdrawal({
+      userId,
+      amount,
+      payoutId: payout.id,
+      bankAccount: {
+        id: bankAccount.id,
+        bankName: bankAccount.bankName,
+        last4: bankAccount.last4
+      },
+      status: 'completed'
+    });
+    
+    await withdrawal.save({ session });
+
+    // 7. Record transaction
+    const transaction = new Transactions({
+      userId,
+      type: 'withdrawal',
+      amount: -amount,
+      status: 'completed',
+      paymentMethod: 'bank_account',
+      stripePayoutId: payout.id,
+      description: `Withdrawal to ${bankAccount.bankName} ****${bankAccount.last4}`
+    });
+    
+    await transaction.save({ session });
+
+    await session.commitTransaction();
+    
+    res.status(200).json({
+      success: true,
+      amount,
+      payoutId: payout.id,
+      estimatedArrival: new Date(payout.arrival_date * 1000)
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    console.error('Withdrawal error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Withdrawal failed'
+    });
+  } finally {
+    session.endSession();
+  }
 };
 
 //******************************************************/ 

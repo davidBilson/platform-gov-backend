@@ -15,6 +15,7 @@ import { createCategory, deleteCategory, getAllCategories, createItem, deleteIte
 import { getContractStats, getAllContracts } from '../controllers/admin/contract.controller.js';
 import { getFeeSettings, updateFeeSettings } from '../controllers/admin/fee.settings.controller.js';
 import { getDashboardData } from '../controllers/admin/dashboard.controller.js';
+import { fetchAllWithdrawals } from '../controllers/payment/withdrawals.controller.js';
 
 const router = express.Router();
 
@@ -26,6 +27,7 @@ router.put('/toggle-priority/:id', toggleUserPriority);
 router.put('/toggle-suspend/:id', toggleUserSuspend);
 router.delete('/delete-user/:id', deleteUser);
 router.get('/user-profile/:id', getUserProfile);
+router.get('/get-all-withdrawals', fetchAllWithdrawals); // All withdrawals
 
 router.get('/get-all-jobs', getAllJobs);
 router.get('/get-job-stats', getJobStats);

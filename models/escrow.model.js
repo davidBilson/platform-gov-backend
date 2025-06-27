@@ -41,120 +41,160 @@ const CURRENCY_CODES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'NGN'];
 // 1. FUNDS SCHEMA
 // ========================================
 
+const statusAmountSchema = new Schema({
+  amount: {
+    type: Number,
+    required: true,
+    min: 0,
+    default: 0
+  },
+  date: {
+    type: Date,
+    required: true,
+    default: Date.now
+  }
+}, { _id: false });
+
 const fundSchema = new Schema({
-  job_id: {
+  clientId: {
+    type: Schema.Types.ObjectId,
+    required: true,
+    index: true,
+    ref: 'User'
+  },
+  contractorId: {
+    type: Schema.Types.ObjectId,
+    index: true,
+    ref: 'User'
+  },
+  jobId: {
     type: Schema.Types.ObjectId,
     required: true,
     index: true,
     ref: 'Jobs'
   },
-  client_id: {
-    type: Schema.Types.ObjectId,
-    required: true,
-    index: true,
-    ref: 'User' // Assuming clients are User documents
-  },
-  contractor_id: {
-    type: Schema.Types.ObjectId,
-    index: true,
-    ref: 'User' // Assuming freelancers are User documents
-  },
-  is_processed: {
-    type: Boolean,
-    default: false,
-    index: true
-  },
-  available_after: Date,
   
-  processing_attempts: {
-    type: Number,
-    default: 0,
-    max: 3
+  // Status-based amount tracking
+  in_escrow: {
+    type: statusAmountSchema,
+    default: { amount: 0, date: new Date() }
+  },
+  pending: {
+    type: statusAmountSchema,
+    default: { amount: 0, date: new Date() }
+  },
+  available: {
+    type: statusAmountSchema,
+    default: { amount: 0, date: new Date() }
+  },
+  released: {
+    type: statusAmountSchema,
+    default: { amount: 0, date: new Date() }
+  },
+  disputed: {
+    type: statusAmountSchema,
+    default: { amount: 0, date: new Date() }
   },
   
+  // Additional metadata
+  currency: {
+    type: String,
+    default: 'USD',
+    uppercase: true
+  },
+  
+  // Stripe integration fields
   stripe_transfer_id: {
     type: String,
     sparse: true,
     unique: true
   },
-  withdrawableAmount: {
-    type: Number,
-    min: 0
-  },
-  amount: {
-    type: Number,
-    required: true,
-    min: [0.01, 'Amount must be greater than 0'],
-    validate: {
-      validator: function(v) {
-        return Number.isFinite(v) && v > 0;
-      },
-      message: 'Amount must be a valid positive number'
-    }
-  },
-  currency: {
-    type: String,
-    required: true,
-    enum: CURRENCY_CODES,
-    default: 'USD',
-    uppercase: true
-  },
-  status: {
-    type: String,
-    required: true,
-    enum: Object.values(FUND_STATUS),
-    default: FUND_STATUS.IN_ESCROW,
-    index: true
-  },
-  due_date: {
-    type: Date,
-    validate: {
-      validator: function(v) {
-        return !v || v > new Date();
-      },
-      message: 'Due date must be in the future'
-    }
-  },
-  admin_notes: {
-    type: String,
-    maxlength: [1000, 'Admin notes cannot exceed 1000 characters']
-  },
-  // Additional useful fields
-  milestone_title: {
-    type: String,
-    maxlength: [200, 'Milestone title cannot exceed 200 characters']
-  },
-  milestone_description: {
-    type: String,
-    maxlength: [1000, 'Milestone description cannot exceed 1000 characters']
-  },
-  work_submitted_at: Date,
-  review_requested_at: Date,
-  released_at: Date,
-  disputed_at: Date,
-  // Delay functionality
-  delay_until: Date,
-  delay_reason: {
-    type: String,
-    maxlength: [500, 'Delay reason cannot exceed 500 characters']
-  },
-  delayed_by: {
-    type: Schema.Types.ObjectId,
-    ref: 'User'
-  },
-  delay_set_at: Date
+  stripe_payout_id: String,
+  available_after: Date,
+  
+  // Tracking fields
+  admin_notes: String,
+  milestone_title: String,
+  milestone_description: String
 }, {
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
 });
 
-// Compound indexes for efficient queries
-fundSchema.index({ client_id: 1, status: 1 });
-fundSchema.index({ status: 1, createdAt: -1 });
-fundSchema.index({ contractor_id: 1, status: 1 });
-fundSchema.index({ job_id: 1, status: 1 });
-fundSchema.index({ created_at: -1 });
+fundSchema.index({ clientId: 1, created_at: -1 });
+fundSchema.index({ contractorId: 1, created_at: -1 });
+// fundSchema.index({ jobId: 1 });
+
+fundSchema.virtual('total_amount').get(function() {
+  return this.in_escrow.amount + this.pending.amount + this.available.amount + 
+         this.released.amount + this.disputed.amount;
+});
+
+fundSchema.virtual('contractor_visible_amount').get(function() {
+  return this.pending.amount + this.available.amount + this.disputed.amount;
+});
+
+fundSchema.virtual('client_visible_amount').get(function() {
+  return this.in_escrow.amount + this.released.amount + this.disputed.amount;
+});
+
+fundSchema.methods.addToEscrow = function(amount) {
+  this.in_escrow.amount += amount;
+  this.in_escrow.date = new Date();
+};
+
+fundSchema.methods.releaseFromEscrow = function(amount) {
+  if (this.in_escrow.amount < amount) {
+    throw new Error('Insufficient funds in escrow');
+  }
+  
+  // Move from escrow to released (for client view)
+  this.in_escrow.amount -= amount;
+  this.released.amount += amount;
+  this.released.date = new Date();
+  
+  // Also add to pending (for contractor view)
+  this.pending.amount += amount;
+  this.pending.date = new Date();
+};
+
+fundSchema.methods.makePendingAvailable = function(amount) {
+  if (this.pending.amount < amount) {
+    throw new Error('Insufficient pending funds');
+  }
+  
+  // Move from pending to available
+  this.pending.amount -= amount;
+  this.available.amount += amount;
+  this.available.date = new Date();
+};
+
+fundSchema.methods.withdrawFromAvailable = function(amount) {
+  if (this.available.amount < amount) {
+    throw new Error('Insufficient available funds');
+  }
+  
+  this.available.amount -= amount;
+  if (this.available.amount === 0) {
+    this.available.date = new Date();
+  }
+};
+
+fundSchema.methods.moveToDisputed = function(amount, fromStatus) {
+  const validStatuses = ['in_escrow', 'pending', 'available'];
+  if (!validStatuses.includes(fromStatus)) {
+    throw new Error('Invalid source status for dispute');
+  }
+  
+  if (this[fromStatus].amount < amount) {
+    throw new Error(`Insufficient funds in ${fromStatus}`);
+  }
+  
+  this[fromStatus].amount -= amount;
+  this.disputed.amount += amount;
+  this.disputed.date = new Date();
+};
 
 // Virtual for checking if fund is overdue
 fundSchema.virtual('is_overdue').get(function() {

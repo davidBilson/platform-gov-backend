@@ -14,6 +14,7 @@ import {
     getAccountStatus,
 } from '../controllers/payment/payment.controller.js';
 import { fundProject, getClientFunds, getContractorFunds, getWithdrawableFunds, releaseFunds, withdrawFunds } from '../controllers/payment/allFunds.controller.js';
+import { fetchWithdrawals } from '../controllers/payment/withdrawals.controller.js';
 
 const router = express.Router();
 
@@ -26,6 +27,7 @@ router.get('/get-account-status/:id', getAccountStatus);
 router.get('/get-withdrawable-funds/:id', getWithdrawableFunds);
 router.get('/get-contractor-funds/:id', getContractorFunds);
 router.get('/get-client-funds/:id', getClientFunds);
+router.get('/get-user-withdrawals/:id', fetchWithdrawals); // User's withdrawals
 
 router.post('/save-payment-method', savePaymentMethod);
 router.post('/fund-project', fundProject);

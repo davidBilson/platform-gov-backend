@@ -18,7 +18,9 @@ const TransactionSchema = new mongoose.Schema({
       'payment_method_added',
       'project_funding',
       'payout_pending', //Funds in 5-day hold
+      'payout_available',
       'payout', // Funds withdrawn
+      'withdrawal',
       'refund',
       'dispute'
     ],

@@ -6,6 +6,7 @@ import Hiring from '../models/hiring.model.js';
 import Contract from '../models/contract.model.js';
 import JobApplication from '../models/job.applications.model.js';
 import Job from '../models/job.created.model.js';
+import { truncateDescription } from '../utils/truncateDescription.js';
 
 const createNotification = async (io, { userId, title, message, type, link = null }) => {
   try {
@@ -186,7 +187,7 @@ export const setupNotificationWatchers = (io) => {
             await createNotification(io, {
               userId: application.freelancerId,
               title: 'Application Viewed',
-              message: `Your application for job "${jobData?.jobTitle || 'a job'}" was viewed by the client`,
+              message: `Your application for job "${truncateDescription(jobData?.jobTitle, 99) || 'a job'}" was viewed by the client`,
               type: 'application_viewed',
               link: `/jobs/${jobData?._id}`
             });

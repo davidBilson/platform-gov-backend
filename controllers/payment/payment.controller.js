@@ -237,7 +237,7 @@ export const getPendingPayouts = async (req, res) => {
     }
 
     const pendingFunds = await Fund.find({
-      status: 'pending_review'
+      status: 'pending'
     })
       .populate({
         path: 'client_id',
