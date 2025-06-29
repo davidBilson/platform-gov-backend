@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config({ path: './config/.env' });
+
 import Withdrawal from '../../models/withdrawal.model.js';
 import Transactions from '../../models/transactions.model.js';
 import User from '../../models/user.model.js';
@@ -6,15 +9,14 @@ import Stripe from 'stripe';
 import { Fund, Transaction as EscrowTransaction, FUND_STATUS } from '../../models/escrow.model.js';
 import Contract from '../../models/contract.model.js';
 import cron from 'node-cron';
-
 import { createEscrowForFundedProject } from './escrow.controller.js';
 import mongoose from 'mongoose';
 
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || 'sk_test_51RZUzrQpiUcmNrzkun1iqWcxZjk6cZXYc5AtPPznpa9D8vNxzLTVZp836xHyzCnbt7Jl7Qes97bv0TlXMnAO29mU00fuaY1StL';
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 
 if (!STRIPE_SECRET_KEY) {
-    console.error('STRIPE_SECRET_KEY is not defined in environment variables');
-    throw new Error('STRIPE_SECRET_KEY environment variable is required');
+  console.error('STRIPE_SECRET_KEY is not defined in environment variables');
+  throw new Error('STRIPE_SECRET_KEY environment variable is required');
 }
 
 export const stripe = new Stripe(STRIPE_SECRET_KEY);
