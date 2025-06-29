@@ -334,7 +334,7 @@ const processPayoutAvailability = async () => {
 };
 
 // Express route handler
-export const trackPayoutAvailability = async (req, res) => {
+export const trackPayoutAvailability = async (req, res) => {2
     try {
         const result = await processPayoutAvailability();
         res.status(200).json(result);
@@ -751,3 +751,228 @@ export const withdrawFunds = async (req, res) => {
 //******************************************************/ 
 // <END CONTROLLERS WORKING WITH LIVE FUNDS INTEGRATED WITH STRIPE END/>
 //******************************************************/ 
+
+export const payInstantly = async (req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    const idempotencyKey = req.headers['idempotency-key'] || `instant-${Date.now()}`;
+
+    try {
+        const { contractId, userId: clientId, amount: totalAmount } = req.body;
+
+        // Validate input
+        if (!contractId || !clientId || !totalAmount || totalAmount <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid contract, user, or amount'
+            });
+        }
+
+        // Retrieve contract and job
+        const contract = await Contract.findById(contractId)
+            .populate('jobId')
+            .populate('contractorId', 'stripeAccountId')
+            .session(session);
+
+        if (!contract) {
+            return res.status(404).json({
+                success: false,
+                message: 'Contract not found'
+            });
+        }
+
+        // Verify client authorization
+        if (contract.clientId.toString() !== clientId.toString()) {
+            return res.status(403).json({
+                success: false,
+                message: 'Unauthorized to pay this contract'
+            });
+        }
+
+        // Check contractor has Stripe account
+        if (!contract.contractorId.stripeAccountId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Contractor has not connected payment account'
+            });
+        }
+
+        // Calculate amounts - totalAmount already includes 5% fee from frontend
+        const platformFee = Math.round(totalAmount * 0.05 * 100) / 100;
+        const netAmountAfterPlatformFee = totalAmount - platformFee;
+        
+        // Additional 5% fee when transferring to contractor
+        const contractorFee = Math.round(netAmountAfterPlatformFee * 0.05 * 100) / 100;
+        const contractorNetAmount = netAmountAfterPlatformFee - contractorFee;
+        const totalPlatformFee = platformFee + contractorFee;
+
+        // Retrieve client payment method
+        const client = await User.findById(clientId).session(session);
+        if (!client || !client.stripeCustomerId || !client.defaultPaymentMethod) {
+            return res.status(400).json({
+                success: false,
+                message: 'Client payment method not set up'
+            });
+        }
+
+        // Create PaymentIntent to charge the client
+        const paymentIntent = await stripe.paymentIntents.create({
+            amount: Math.round(totalAmount * 100),
+            currency: 'usd',
+            customer: client.stripeCustomerId,
+            payment_method: client.defaultPaymentMethod,
+            confirm: true,
+            off_session: true,
+            metadata: {
+                contractId: contract._id.toString(),
+                clientId: client._id.toString(),
+                contractorId: contract.contractorId._id.toString(),
+                paymentType: 'instant'
+            },
+            description: `Instant payment for contract: ${contract.jobId.jobTitle || 'Untitled Job'}`
+        }, {
+            idempotencyKey: idempotencyKey
+        });
+
+        // Handle authentication requirements
+        if (paymentIntent.status === 'requires_action') {
+            return res.status(200).json({
+                success: false,
+                requires_action: true,
+                client_secret: paymentIntent.client_secret,
+                message: 'Payment requires authentication'
+            });
+        }
+
+        if (paymentIntent.status !== 'succeeded') {
+            return res.status(400).json({
+                success: false,
+                message: `Payment failed: ${paymentIntent.status}`
+            });
+        }
+
+        // Create transfer to contractor's Stripe account
+        const transfer = await stripe.transfers.create({
+            amount: Math.round(contractorNetAmount * 100),
+            currency: 'usd',
+            destination: contract.contractorId.stripeAccountId,
+            metadata: {
+                contractId: contractId,
+                clientId: clientId,
+                contractorId: contract.contractorId._id.toString(),
+                paymentType: 'instant',
+                originalAmount: totalAmount.toString()
+            }
+        });
+
+        // Calculate availability date (5 days from now)
+        let availableAfterDate;
+        if (transfer.available_on && typeof transfer.available_on === 'number') {
+            availableAfterDate = new Date(transfer.available_on * 1000);
+            if (isNaN(availableAfterDate.getTime())) {
+                console.warn('Invalid available_on timestamp from Stripe:', transfer.available_on);
+                availableAfterDate = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
+            }
+        } else {
+            console.warn('No available_on field in Stripe transfer response, using default');
+            availableAfterDate = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
+        }
+
+        // Create or update Fund entry for the contractor
+        let fund = await Fund.findOne({ 
+            jobId: contract.jobId._id,
+            contractorId: contract.contractorId._id 
+        }).session(session);
+
+        if (!fund) {
+            // Create new fund
+            fund = new Fund({
+                jobId: contract.jobId._id,
+                clientId: clientId,
+                contractorId: contract.contractorId._id,
+                currency: 'USD',
+                in_escrow: { amount: 0, date: new Date() },
+                pending: { amount: contractorNetAmount, date: new Date() },
+                available: { amount: 0, date: new Date() },
+                released: { amount: 0, date: new Date() },
+                disputed: { amount: 0, date: new Date() },
+                stripe_transfer_id: transfer.id,
+                available_after: availableAfterDate,
+                created_at: new Date()
+            });
+        } else {
+            // Update existing fund - add to pending
+            fund.pending.amount += contractorNetAmount;
+            fund.pending.date = new Date();
+            fund.stripe_transfer_id = transfer.id;
+            fund.available_after = availableAfterDate;
+        }
+
+        await fund.save({ session });
+
+        // Record client transaction (debit)
+        const clientTransaction = await Transactions.create([{
+            userId: clientId,
+            jobId: contract.jobId._id,
+            contractId: contract._id,
+            type: 'instant_payment_client',
+            amount: -totalAmount,
+            fee: totalPlatformFee,
+            netAmount: -totalAmount,
+            status: 'completed',
+            paymentMethod: 'card',
+            stripePaymentIntentId: paymentIntent.id,
+            description: `Instant payment for ${contract.jobId.jobTitle || 'contract work'}`
+        }], { session });
+
+        // Record contractor transaction (pending)
+        const contractorTransaction = await Transactions.create([{
+            userId: contract.contractorId._id,
+            jobId: contract.jobId._id,
+            contractId: contract._id,
+            type: 'payout_pending',
+            amount: contractorNetAmount,
+            fee: contractorFee,
+            netAmount: contractorNetAmount,
+            status: 'pending',
+            paymentMethod: 'escrow',
+            stripeTransferId: transfer.id,
+            description: `Instant payment - available on ${availableAfterDate.toDateString()}`
+        }], { session });
+
+        await session.commitTransaction();
+        
+        console.log('Instant payment processed successfully, funds pending for contractor');
+        res.status(200).json({
+            success: true,
+            message: 'Payment processed successfully. Funds will be available for withdrawal after processing.',
+            paymentIntentId: paymentIntent.id,
+            transferId: transfer.id,
+            amount: totalAmount,
+            contractorNetAmount: contractorNetAmount,
+            totalPlatformFee: totalPlatformFee,
+            availableOn: availableAfterDate
+        });
+
+    } catch (error) {
+        await session.abortTransaction();
+        
+        console.error('Instant payment error:', error);
+        
+        // Handle Stripe errors specifically
+        if (error.type === 'StripeCardError') {
+            return res.status(400).json({
+                success: false,
+                message: error.message
+            });
+        }
+
+        res.status(500).json({
+            success: false,
+            message: 'Instant payment failed',
+            error: error.message
+        });
+    } finally {
+        session.endSession();
+    }
+};

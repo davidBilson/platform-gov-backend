@@ -22,7 +22,9 @@ const TransactionSchema = new mongoose.Schema({
       'payout', // Funds withdrawn
       'withdrawal',
       'refund',
-      'dispute'
+      'dispute',
+      'instant_payment_client',
+      'instant_payment_contractor'
     ],
     required: true
   },
@@ -55,7 +57,7 @@ const TransactionSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['card', 'bank_account', 'paypal', 'escrow'],
+    enum: ['card', 'bank_account', 'paypal', 'escrow', 'stripe'],
     required: true
   },
   stripePaymentIntentId: String,

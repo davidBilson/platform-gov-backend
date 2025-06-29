@@ -13,7 +13,7 @@ import {
     createOnboardingLink,
     getAccountStatus,
 } from '../controllers/payment/payment.controller.js';
-import { fundProject, getClientFunds, getContractorFunds, getWithdrawableFunds, releaseFunds, withdrawFunds } from '../controllers/payment/allFunds.controller.js';
+import { fundProject, getClientFunds, getContractorFunds, getWithdrawableFunds, payInstantly, releaseFunds, withdrawFunds } from '../controllers/payment/allFunds.controller.js';
 import { fetchWithdrawals } from '../controllers/payment/withdrawals.controller.js';
 
 const router = express.Router();
@@ -36,6 +36,7 @@ router.post('/create-freelancer-account', createFreelancerAccount);
 router.post('/release-funds', releaseFunds);
 router.post('/create-onboarding-link/:id', createOnboardingLink)
 router.post('/withdraw-funds/:id', withdrawFunds);
+router.post('/pay-instantly', payInstantly)
 
 router.put('/update-payment-method', updateDefaultPaymentMethod);
 

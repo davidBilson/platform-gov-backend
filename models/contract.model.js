@@ -20,6 +20,29 @@ const contractSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   },
+
+  // // // // // // \\ \\ \\ \\ \\
+  isPaymentAmountConfirmed: { // contractor should confirm payment here if it tallies with agreement had on chat
+    type: Boolean,
+    default: false
+  },
+  isStarted: {
+    type: Boolean,
+    default: false
+  },
+  timeBasedPayment: {
+    amount: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    isPaid: {
+      type: Boolean,
+      default: false
+    }
+  },
+  // // // // // // \\ \\ \\ \\ \\
+
   totalEarnings: {
     type: Number,
     min: 0,
