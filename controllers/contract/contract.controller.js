@@ -347,6 +347,7 @@ export const createContract = async (req, res) => {
 
 export const getSingleContract = async (req, res) => {
   try {
+
     const { jobId, clientId, contractorId, mutualContractId } = req.body;
 
     const hasMutualId = mutualContractId;
@@ -365,18 +366,18 @@ export const getSingleContract = async (req, res) => {
       contract = await Contract.findOne({
         _id: mutualContractId
       })
-      .populate('jobId', 'title')
+      .populate('jobId', 'jobTitle')
       .populate('clientId', 'name email profileImage')
-      .populate('contractorId', 'name email profileImage');
+      .populate('contractorId', 'name email profileImage bankAccounts isHighPriority');
     } else {
       contract = await Contract.findOne({
         jobId,
         clientId,
         contractorId
       })
-      .populate('jobId', 'title')
+      .populate('jobId', 'jobTitle')
       .populate('clientId', 'name email profileImage')
-      .populate('contractorId', 'name email profileImage');
+      .populate('contractorId', 'name email profileImage bankAccounts isHighPriority');
     }
 
     if (!contract) {

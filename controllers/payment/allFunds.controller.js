@@ -926,7 +926,7 @@ export const payInstantly = async (req, res) => {
             status: 'completed',
             paymentMethod: 'card',
             stripePaymentIntentId: paymentIntent.id,
-            description: `Instant payment for ${contract.jobId.jobTitle || 'contract work'}`
+            description: `Instant payment for: ${contract.jobId.jobTitle || 'Untitled Job'}`
         }], { session });
 
         // Record contractor transaction (pending)
@@ -941,7 +941,7 @@ export const payInstantly = async (req, res) => {
             status: 'pending',
             paymentMethod: 'escrow',
             stripeTransferId: transfer.id,
-            description: `Instant payment - available on ${availableAfterDate.toDateString()}`
+            description: `Payment received for: ${contract.jobId.jobTitle || 'Untitled Job'} (available ${availableAfterDate.toDateString()})`
         }], { session });
 
         await session.commitTransaction();
