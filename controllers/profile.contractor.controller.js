@@ -67,6 +67,7 @@ export const getAllContractorProfiles = async (req, res) => {
 
 export const getContractorProfile = async (req, res) => {
   try {
+    
     const userId = req.params.id;
     
     if (!userId || !isValidObjectId(userId)) {
@@ -79,7 +80,7 @@ export const getContractorProfile = async (req, res) => {
     let profile = await ContractorProfile.findOne({ user: userId })
       .populate({
         path: 'user',
-        select: 'name isHighPriority isSuspended'
+        select: 'name isHighPriority isSuspended bankAccounts'
       });
     
     if (!profile) {

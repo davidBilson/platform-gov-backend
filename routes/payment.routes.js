@@ -13,7 +13,7 @@ import {
     createOnboardingLink,
     getAccountStatus,
 } from '../controllers/payment/payment.controller.js';
-import { fundProject, getClientFunds, getContractorFunds, getWithdrawableFunds, payInstantly, releaseFunds, withdrawFunds } from '../controllers/payment/allFunds.controller.js';
+import { fundProject, getClientFunds, getContractorFunds, getRetainerContractPayments, getWithdrawableFunds, payInstantly, releaseFunds, withdrawFunds } from '../controllers/payment/allFunds.controller.js';
 import { fetchWithdrawals } from '../controllers/payment/withdrawals.controller.js';
 
 const router = express.Router();
@@ -28,6 +28,7 @@ router.get('/get-withdrawable-funds/:id', getWithdrawableFunds);
 router.get('/get-contractor-funds/:id', getContractorFunds);
 router.get('/get-client-funds/:id', getClientFunds);
 router.get('/get-user-withdrawals/:id', fetchWithdrawals); // User's withdrawals
+router.get('/get-retainer-contract-payments/:id', getRetainerContractPayments)
 
 router.post('/save-payment-method', savePaymentMethod);
 router.post('/fund-project', fundProject);

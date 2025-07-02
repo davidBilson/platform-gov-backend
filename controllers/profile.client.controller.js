@@ -52,12 +52,19 @@ export const getClientProfile = async (req, res) => {
     }
     
     // Try string match first (in case the model expects string IDs)
-    let profile = await ClientProfile.findOne({ user: userId });
+    let profile = await ClientProfile.findOne({ user: userId })
+    .populate({
+      path: 'user',
+      select: 'name isHighPriority isSuspended bankAccounts'
+    });
     
-    // If not found, try with ObjectId
     if (!profile) {
       const objectId = new mongoose.Types.ObjectId(userId.toString());
-      profile = await ClientProfile.findOne({ user: objectId });
+      profile = await ClientProfile.findOne({ user: objectId })
+      .populate({
+        path: 'user',
+        select: 'name isHighPriority isSuspended bankAccounts'
+      });
     }
     
     if (!profile) {
@@ -71,6 +78,7 @@ export const getClientProfile = async (req, res) => {
       success: true,
       data: profile
     });
+
   } catch (error) {
     res.status(500).json({
       success: false,
