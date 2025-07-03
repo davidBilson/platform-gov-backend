@@ -35,14 +35,37 @@ const verifyUserRole = async (userId) => {
 
 export const getAllJobs = async (req, res) => {
   try {
+    // Extract pagination parameters from query
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    // Get total count for pagination info
+    const totalJobs = await Job.countDocuments();
+    const totalPages = Math.ceil(totalJobs / limit);
+
+    // Fetch jobs with pagination
     const jobs = await Job.find()
       .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
       .populate('userId', 'name email profile'); // Populate user info
     
+    // Create pagination info
+    const pagination = {
+      total: totalJobs,
+      page: page,
+      limit: limit,
+      pages: totalPages,
+      hasNext: page < totalPages,
+      hasPrev: page > 1
+    };
+
     res.status(200).json({
       success: true,
       data: jobs,
-      count: jobs.length
+      count: jobs.length,
+      pagination: pagination
     });
   } catch (error) {
     res.status(500).json({
