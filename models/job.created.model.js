@@ -117,7 +117,7 @@ const jobSchema = new mongoose.Schema({
   },
   paymentType: {
     type: String,
-    enum: ['hourly', 'fixed-price', 'retainer'],
+    enum: ['hourly', 'fixed-price', 'retainer', 'commission'],
     required: true
   },
   price: {
