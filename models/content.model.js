@@ -31,6 +31,10 @@ const itemSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  sortOrder: {
+    type: Number,
+    default: 0
+  },
   createdAt: {
     type: Date,
     default: Date.now

@@ -340,6 +340,8 @@ export const requestPasswordReset = async (req, res, next) => {
   try {
     const { email } = req.body;
     
+    console.log('Requesting password reset for email:', email);
+
     const user = await User.findOne({ email });
     
     if (!user) {

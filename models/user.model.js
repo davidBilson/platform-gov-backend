@@ -29,7 +29,7 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['contractor', 'client', 'admin'],
+    enum: ['contractor', 'client', 'admin', 'superadmin'],
     default: 'contractor'
   },
   isSuspended: {

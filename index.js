@@ -56,6 +56,19 @@ app.set('io', io);
 
 // Routes
 app.use('/api', routes);
+// app.use('*', (req, res) => {
+//   res.status(404).json({ 
+//     error: 'Route not found',
+//     path: req.originalUrl 
+//   });
+// });
+
+app.use((req, res) => {
+  res.status(404).json({ 
+    error: 'Route not found',
+    path: req.originalUrl 
+  });
+});
 
 const configureSocketIO = () => {
   io.on('connection', (socket) => {
@@ -128,7 +141,7 @@ const startServer = async () => {
     configureSocketIO();
 
     // Start HTTP server
-    httpServer.listen(PORT, () => {
+    httpServer.listen(PORT, '0.0.0.0',() => {
       console.log(`Server running on port ${PORT}`);
       console.log(`Socket.IO server ready`);
       console.log('Notification watchers initialized');

@@ -22,6 +22,8 @@ export const fetchAllCategoriesAndItems = async (req, res) => {
               in: {
                 _id: '$$item._id',
                 value: '$$item.value',
+                sortOrder: '$$item.sortOrder',
+                category: '$$item.category',
                 createdAt: '$$item.createdAt'
               }
             }

@@ -2,43 +2,46 @@
 import User from '../../models/user.model.js';
 
 export const validateAdmin = async (req, res, next) => {
-    try {
-      const { adminId } = req.method === 'GET' || req.method === 'PUT' || req.method === 'DELETE' ? req.query || req.body : req.body;
+  try {
 
-      if (!adminId) {
-        console.log('Admin ID is required')
-        return res.status(400).json({
-          success: false,
-          message: 'Admin ID is required'
-        });
-      }
-  
-      const admin = await User.findById(adminId);
-      
-      if (!admin) {
-        return res.status(404).json({
-          success: false,
-          message: 'Admin user not found'
-        });
-      }
-  
-      if (admin.role !== 'admin') {
-        return res.status(403).json({
-          success: false,
-          message: 'Access denied. Admin privileges required'
-        });
-      }
-  
-      req.admin = admin;
-      next();
-    } catch (error) {
-      return res.status(500).json({
+    const { adminId } = req.method === 'GET' || req.method === 'PUT' || req.method === 'POST' || req.method === 'DELETE' ? req.query || req.body : req.body;
+
+    
+    if (!adminId) {
+      console.log('Admin ID is missing in the request - validationAdminId');
+      return res.status(400).json({
         success: false,
-        message: 'Server error during admin validation',
-        error: error.message
+        message: 'Admin ID is required'
       });
     }
-  };
+
+    const admin = await User.findById(adminId);
+    
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: 'Admin user not found'
+      });
+    }
+
+    // FIX: Changed || to && to properly validate admin roles
+    if (admin.role !== 'admin' && admin.role !== 'superadmin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Admin privileges required'
+      });
+    }
+
+    req.admin = admin;
+    next();
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Server error during admin validation',
+      error: error.message
+    });
+  }
+};
 
 export const getAllUsers = async (req, res) => {
   try {
@@ -53,7 +56,6 @@ export const getAllUsers = async (req, res) => {
       query.role = role;
     }
 
-    // Search functionality (name or email)
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },

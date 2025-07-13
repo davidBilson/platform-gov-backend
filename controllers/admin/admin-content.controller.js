@@ -101,8 +101,20 @@ export const createItem = async (req, res) => {
       });
     }
     
+    // Get the highest sortOrder in the category and add 1
+    const maxSortOrder = await ContentItem.findOne(
+      { category: categoryId }, 
+      { sortOrder: 1 }
+    ).sort({ sortOrder: -1 });
+    
+    const newSortOrder = maxSortOrder ? maxSortOrder.sortOrder + 1 : 1;
+    
     // Create new item
-    const newItem = new ContentItem({ category: categoryId, value });
+    const newItem = new ContentItem({ 
+      category: categoryId, 
+      value,
+      sortOrder: newSortOrder
+    });
     await newItem.save();
     
     res.status(201).json({
@@ -152,11 +164,60 @@ export const getItemsByCategory = async (req, res) => {
   try {
     const categoryId = req.params.id;
     
-    const items = await ContentItem.find({ category: categoryId }).sort({ createdAt: -1 });
+    // Sort by sortOrder first, then by createdAt for items with same sortOrder
+    const items = await ContentItem.find({ category: categoryId })
+      .sort({ sortOrder: 1, createdAt: 1 });
+    
     res.json({ 
       success: true, 
       data: items 
     });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+};
+
+// Update item sort order
+export const updateItemsOrder = async (req, res) => {
+  try {
+    const { items } = req.body;
+    
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Items array is required'
+      });
+    }
+    
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    
+    try {
+      // Update all items with new sort orders
+      const bulkOps = items.map(item => ({
+        updateOne: {
+          filter: { _id: item.id },
+          update: { sortOrder: item.sortOrder }
+        }
+      }));
+      
+      await ContentItem.bulkWrite(bulkOps, { session });
+      
+      await session.commitTransaction();
+      
+      res.json({
+        success: true,
+        message: 'Items order updated successfully'
+      });
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
   } catch (error) {
     res.status(500).json({ 
       success: false, 
