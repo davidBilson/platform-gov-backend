@@ -56,12 +56,6 @@ app.set('io', io);
 
 // Routes
 app.use('/api', routes);
-// app.use('*', (req, res) => {
-//   res.status(404).json({ 
-//     error: 'Route not found',
-//     path: req.originalUrl 
-//   });
-// });
 
 app.use((req, res) => {
   res.status(404).json({ 

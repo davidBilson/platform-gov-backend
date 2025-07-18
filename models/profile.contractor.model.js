@@ -73,7 +73,6 @@ const contractorProfileSchema = new Schema({
   },
   bio: {
     type: String,
-    trim: true
   },
   profileImage: {
     type: String,
@@ -94,7 +93,6 @@ const contractorProfileSchema = new Schema({
   },
   primaryPosition: {
     type: String,
-    trim: true
   },
   profession: {
     type: String,

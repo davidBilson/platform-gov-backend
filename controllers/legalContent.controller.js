@@ -68,7 +68,7 @@ import LegalDocument from "../models/legalcontent.model.js";
         { documentType },
         { 
           title: title.trim(),
-          description: description.trim(),
+          description: description,
           documentType 
         },
         { 

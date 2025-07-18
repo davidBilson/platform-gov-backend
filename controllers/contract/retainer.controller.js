@@ -85,7 +85,7 @@ export const submitWorkSummary = async function(req, res) {
       });
     }
 
-    if (!summaryText || summaryText.trim() === '') {
+    if (!summaryText || summaryText === '') {
       return res.status(400).json({ 
         success: false, 
         message: 'Work summary text is required' 

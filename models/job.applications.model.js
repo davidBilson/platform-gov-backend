@@ -22,7 +22,6 @@ const jobApplicationSchema = new mongoose.Schema({
   coverLetter: {
     type: String,
     required: function() { return this.status !== 'draft'; },
-    trim: true
   },
   proposedRate: {
     type: Number,
@@ -34,7 +33,6 @@ const jobApplicationSchema = new mongoose.Schema({
   proposedMilestones: [{
     description: {
       type: String,
-      trim: true
     },
     price: {
       type: Number,

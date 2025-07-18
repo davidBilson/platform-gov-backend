@@ -195,8 +195,6 @@ export const updateContractorProfile = async (req, res) => {
       });
     }
     
-    // console.log(req.body)
-
     // Convert to ObjectId
     const objectId = new mongoose.Types.ObjectId(userId.toString());
     

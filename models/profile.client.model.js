@@ -39,7 +39,6 @@ const clientProfileSchema = new mongoose.Schema({
   },
   overview: {
     type: String,
-    trim: true
   },
   logo: {
     type: String,
