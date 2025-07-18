@@ -61,7 +61,7 @@ router.put('/fee-settings', updateFeeSettings);
 router.get('/dashboard', getDashboardData);
 router.delete('/delete-user/:id', deleteUser);
 
-router.get('/get-legal-content-by-type/:documentType', getDocumentByType);
+// router.get('/get-legal-content-by-type/:documentType', getDocumentByType);
 router.post('/upsert-legal-content', upsertDocument);
 
 export default router;

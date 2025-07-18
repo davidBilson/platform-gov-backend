@@ -157,6 +157,7 @@ export const createContractorProfile = async (req, res) => {
       profileImage,
       clearance: req.body.clearance || '',
       ratePerHour: req.body.ratePerHour || 0,
+      secondRate: req.body.secondRate || 0,
       profession: req.body.profession || '',
       primaryPosition: req.body.primaryPosition || '',
       firmAffiliation: req.body.firmAffiliation || '',
@@ -194,6 +195,8 @@ export const updateContractorProfile = async (req, res) => {
       });
     }
     
+    // console.log(req.body)
+
     // Convert to ObjectId
     const objectId = new mongoose.Types.ObjectId(userId.toString());
     
@@ -223,6 +226,7 @@ export const updateContractorProfile = async (req, res) => {
     const updateData = {
       bio: req.body.bio || profile.bio,
       ratePerHour: req.body.ratePerHour || profile.ratePerHour,
+      secondRate: req.body.secondRate || profile.secondRate,
       primaryPosition: req.body.primaryPosition || profile.primaryPosition,
       profession: req.body.profession || profile.profession,
       firmAffiliation: req.body.firmAffiliation ?? profile.firmAffiliation,

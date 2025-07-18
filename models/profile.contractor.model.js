@@ -56,7 +56,11 @@ const DegreeSchema = new Schema({
   yearCompleted: {
     type: String,
     trim: true
-  }
+  },
+  gpa: {
+    type: String,
+    trim: true
+  },
 });
 
 // Profile schema
@@ -81,6 +85,10 @@ const contractorProfileSchema = new Schema({
     default: ''
   },
   ratePerHour: {
+    type: Number,
+    default: 0
+  },
+  secondRate: {
     type: Number,
     default: 0
   },

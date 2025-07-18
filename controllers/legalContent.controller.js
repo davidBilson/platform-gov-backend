@@ -5,6 +5,7 @@ import LegalDocument from "../models/legalcontent.model.js";
     try {
       const { documentType } = req.params;
       if (![
+        'legal-agreement', 
         'terms-of-use', 
         'non-circumvention-policy', 
         'consent-to-signature-and-commission',
@@ -50,7 +51,8 @@ import LegalDocument from "../models/legalcontent.model.js";
       }
 
       if (![
-        'terms-of-use', 
+        'legal-agreement',
+        'terms-of-use',
         'non-circumvention-policy', 
         'consent-to-signature-and-commission',
         'liability-disclaimer',

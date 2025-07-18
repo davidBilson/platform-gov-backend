@@ -15,7 +15,8 @@ const legalDocumentSchema = new mongoose.Schema({
     type: String,
     required: true,
     enum: [
-        'terms-of-use', 
+        'legal-agreement',
+        'terms-of-use',
         'non-circumvention-policy', 
         'consent-to-signature-and-commission',
         'liability-disclaimer',
