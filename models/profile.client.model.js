@@ -53,7 +53,7 @@ const clientProfileSchema = new mongoose.Schema({
     trim: true
   },
   department: {
-    type: String,
+    type: [String],
     trim: true
   },
   clearance: {

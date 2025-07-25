@@ -110,6 +110,7 @@ export const createClientProfile = async (req, res) => {
     }
     
     // Parse arrays if they come as strings
+    const department = parseArrayField(req.body.department);
     const specializations = parseArrayField(req.body.specializations);
     let locations = parseArrayField(req.body.locations);
     
@@ -136,7 +137,7 @@ export const createClientProfile = async (req, res) => {
       logo,
       industry: req.body.industry || '',
       size: req.body.size || '',
-      department: req.body.department || "",
+      department,
       clearance: req.body.clearance || "",
       specializations,
       locations
