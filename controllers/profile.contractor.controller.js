@@ -215,7 +215,7 @@ export const updateContractorProfile = async (req, res) => {
     
     // Parse arrays if they come as strings
     const skills = parseArrayField(req.body.skills) ?? profile.skills;
-    const expertise = parseArrayField(req.body.expertise) ?? profile.expertise;
+    // const expertise = parseArrayField(req.body.expertise) ?? profile.expertise;
     const certifications = parseArrayField(req.body.certifications) ?? profile.certifications;
     const workHistory = parseArrayField(req.body.workHistory) ?? profile.workHistory;
     const degrees = parseArrayField(req.body.degrees) ?? profile.degrees;
@@ -231,7 +231,7 @@ export const updateContractorProfile = async (req, res) => {
       clearance: req.body.clearance ?? profile.clearance,
       location: req.body.location ?? profile.location,
       skills,
-      expertise,
+      // expertise,
       certifications,
       workHistory,
       degrees,
