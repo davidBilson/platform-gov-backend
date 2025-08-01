@@ -1,8 +1,6 @@
 import mongoose from 'mongoose';
 
-/**
- * Connect to MongoDB with retry mechanism
- */
+
 const connectDB = async () => {
   const MAX_DB_CONN_RETRIES = parseInt(process.env.MAX_DB_CONN_RETRIES);
   const DB_CONN_RETRY_INTERVAL = parseInt(process.env.DB_CONN_RETRY_INTERVAL);
@@ -10,7 +8,15 @@ const connectDB = async () => {
 
   const connect = async () => {
     try {
-      const conn = await mongoose.connect(process.env.MONGODB_URI);
+      
+      const MONGODB_URI = process.env.MONGODB_URI;
+
+      if (!MONGODB_URI) {
+        console.error('MONGO_URI is not defined in environment variables');
+        throw new Error('MONGO_URI is undefined')
+      }
+
+      const conn = await mongoose.connect(MONGODB_URI);
 
       console.log(`MongoDB Connected: ${conn.connection.host}`);
       return true;
@@ -20,7 +26,7 @@ const connectDB = async () => {
       if (retries < MAX_DB_CONN_RETRIES) {
         retries++;
         console.log(`Retrying database connection (${retries}/${MAX_DB_CONN_RETRIES}) in ${DB_CONN_RETRY_INTERVAL / 1000}s...`);
-        
+
         await new Promise(resolve => setTimeout(resolve, DB_CONN_RETRY_INTERVAL));
         return connect();
       } else {

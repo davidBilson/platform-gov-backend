@@ -10,6 +10,7 @@ import connectDB from './config/database.js';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { setupNotificationWatchers } from './controllers/notification.controller.js';
+import { MessageThread } from './models/messaging.system.model.js';
 
 const app = express();
 const PORT = process.env.PORT;
@@ -34,7 +35,8 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(origin
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    // if (!origin || allowedOrigins.includes(origin)) {
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS policy'));
