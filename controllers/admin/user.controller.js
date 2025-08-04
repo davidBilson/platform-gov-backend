@@ -6,7 +6,7 @@ export const validateAdmin = async (req, res, next) => {
 
     const { adminId } = req.method === 'GET' || req.method === 'PUT' || req.method === 'POST' || req.method === 'DELETE' ? req.query || req.body : req.body;
 
-    
+
     if (!adminId) {
       console.log('Admin ID is missing in the request - validationAdminId');
       return res.status(400).json({
@@ -16,7 +16,7 @@ export const validateAdmin = async (req, res, next) => {
     }
 
     const admin = await User.findById(adminId);
-    
+
     if (!admin) {
       return res.status(404).json({
         success: false,
@@ -50,7 +50,7 @@ export const getAllUsers = async (req, res) => {
 
     // Build query object
     let query = {};
-    
+
     // Filter by role if provided
     if (role && ['contractor', 'client', 'admin'].includes(role)) {
       query.role = role;
@@ -98,170 +98,170 @@ export const getAllUsers = async (req, res) => {
 };
 
 export const getUserStats = async (req, res) => {
-    try {
-      const totalUsers = await User.countDocuments();
-      const contractors = await User.countDocuments({ role: 'contractor' });
-      const clients = await User.countDocuments({ role: 'client' });
-      const admins = await User.countDocuments({ role: 'admin' });
-      const verifiedEmails = await User.countDocuments({ isEmailVerified: true });
-      const verifiedPhones = await User.countDocuments({ isPhoneVerified: true });
-  
-      // Recent users (last 30 days)
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const recentUsers = await User.countDocuments({ 
-        createdAt: { $gte: thirtyDaysAgo } 
-      });
-  
-      res.status(200).json({
-        success: true,
-        message: 'Admin stats retrieved successfully',
-        data: {
-          totalUsers: totalUsers - 1,
-          usersByRole: {
-            contractors,
-            clients,
-            admins
-          },
-          verification: {
-            verifiedEmails,
-            verifiedPhones
-          },
-          recentUsers
-        }
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: 'Error retrieving admin stats',
-        error: error.message
-      });
-    }
-  };
+  try {
+    const totalUsers = await User.countDocuments();
+    const contractors = await User.countDocuments({ role: 'contractor' });
+    const clients = await User.countDocuments({ role: 'client' });
+    const admins = await User.countDocuments({ role: 'admin' });
+    const verifiedEmails = await User.countDocuments({ isEmailVerified: true });
+    const verifiedPhones = await User.countDocuments({ isPhoneVerified: true });
 
-  export const toggleUserPriority = async (req, res) => {
-    try {
-      const userId = req.params.id;
-      const { isHighPriority } = req.body;
-  
-      const user = await User.findByIdAndUpdate(
-        userId,
-        { isHighPriority },
-        { new: true }
-      );
-  
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: 'User not found'
-        });
-      }
-  
-      res.status(200).json({
-        success: true,
-        message: 'Priority status updated',
-        user
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: 'Error updating priority status',
-        error: error.message
-      });
-    }
-  };
+    // Recent users (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const recentUsers = await User.countDocuments({
+      createdAt: { $gte: thirtyDaysAgo }
+    });
 
-  export const toggleUserSuspend = async (req, res) => {
-    try {
-      const userId = req.params.id;
-      const { isSuspended } = req.body;
-  
-      const user = await User.findByIdAndUpdate(
-        userId,
-        { isSuspended },
-        { new: true }
-      );
-  
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: 'User not found'
-        });
+    res.status(200).json({
+      success: true,
+      message: 'Admin stats retrieved successfully',
+      data: {
+        totalUsers: totalUsers - 1,
+        usersByRole: {
+          contractors,
+          clients,
+          admins
+        },
+        verification: {
+          verifiedEmails,
+          verifiedPhones
+        },
+        recentUsers
       }
-  
-      res.status(200).json({
-        success: true,
-        message: 'Suspend status updated',
-        user
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: 'Error updating suspend status',
-        error: error.message
-      });
-    }
-  };
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving admin stats',
+      error: error.message
+    });
+  }
+};
 
-  export const deleteUser = async (req, res) => {
-    try {
-      const userId = req.params.id;
-  
-      // Delete user and associated profile
-      const [user, clientProfile, contractorProfile] = await Promise.all([
-        User.findByIdAndDelete(userId),
-        ClientProfile.findOneAndDelete({ user: userId }),
-        ContractorProfile.findOneAndDelete({ user: userId })
-      ]);
-  
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: 'User not found'
-        });
-      }
-  
-      res.status(200).json({
-        success: true,
-        message: 'User deleted successfully'
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: 'Error deleting user',
-        error: error.message
-      });
-    }
-  };
+export const toggleUserPriority = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { isHighPriority } = req.body;
 
-  export const getUserProfile = async (req, res) => {
-    try {
-      const userId = req.params.id;
-  
-      const user = await User.findById(userId).select('-password');
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: 'User not found'
-        });
-      }
-  
-      let profile = null;
-      if (user.role === 'client') {
-        profile = await ClientProfile.findOne({ user: userId });
-      } else if (user.role === 'contractor') {
-        profile = await ContractorProfile.findOne({ user: userId });
-      }
-  
-      res.status(200).json({
-        success: true,
-        data: { user, profile }
-      });
-    } catch (error) {
-      res.status(500).json({
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { isHighPriority },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({
         success: false,
-        message: 'Error fetching user profile',
-        error: error.message
+        message: 'User not found'
       });
     }
-  };
+
+    res.status(200).json({
+      success: true,
+      message: 'Priority status updated',
+      user
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error updating priority status',
+      error: error.message
+    });
+  }
+};
+
+export const toggleUserSuspend = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { isSuspended } = req.body;
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { isSuspended },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Suspend status updated',
+      user
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error updating suspend status',
+      error: error.message
+    });
+  }
+};
+
+export const deleteUser = async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    // Delete user and associated profile
+    const [user, clientProfile, contractorProfile] = await Promise.all([
+      User.findByIdAndDelete(userId),
+      ClientProfile.findOneAndDelete({ user: userId }),
+      ContractorProfile.findOneAndDelete({ user: userId })
+    ]);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'User deleted successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting user',
+      error: error.message
+    });
+  }
+};
+
+export const getUserProfile = async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    const user = await User.findById(userId).select('-password');
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    let profile = null;
+    if (user.role === 'client') {
+      profile = await ClientProfile.findOne({ user: userId });
+    } else if (user.role === 'contractor') {
+      profile = await ContractorProfile.findOne({ user: userId });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: { user, profile }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching user profile',
+      error: error.message
+    });
+  }
+};

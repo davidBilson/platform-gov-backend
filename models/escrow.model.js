@@ -8,7 +8,7 @@ const FUND_STATUS = {
   PENDING: 'pending', // state 2
   AVAILABLE: 'available', //state 3
 
-  
+
   IN_REVIEW: 'in_review',
   WITHDRAWN: 'withdrawn',
   IN_DISPUTE: 'in_dispute'
@@ -73,7 +73,7 @@ const fundSchema = new Schema({
     index: true,
     ref: 'Jobs'
   },
-  
+
   // Status-based amount tracking
   in_escrow: {
     type: statusAmountSchema,
@@ -95,14 +95,14 @@ const fundSchema = new Schema({
     type: statusAmountSchema,
     default: { amount: 0, date: new Date() }
   },
-  
+
   // Additional metadata
   currency: {
     type: String,
     default: 'USD',
     uppercase: true
   },
-  
+
   // Stripe integration fields
   stripe_transfer_id: {
     type: String,
@@ -111,7 +111,7 @@ const fundSchema = new Schema({
   },
   stripe_payout_id: String,
   available_after: Date,
-  
+
   // Tracking fields
   admin_notes: String,
   milestone_title: String,
@@ -126,111 +126,111 @@ fundSchema.index({ clientId: 1, created_at: -1 });
 fundSchema.index({ contractorId: 1, created_at: -1 });
 // fundSchema.index({ jobId: 1 });
 
-fundSchema.virtual('total_amount').get(function() {
-  return this.in_escrow.amount + this.pending.amount + this.available.amount + 
-         this.released.amount + this.disputed.amount;
+fundSchema.virtual('total_amount').get(function () {
+  return this.in_escrow.amount + this.pending.amount + this.available.amount +
+    this.released.amount + this.disputed.amount;
 });
 
-fundSchema.virtual('contractor_visible_amount').get(function() {
+fundSchema.virtual('contractor_visible_amount').get(function () {
   return this.pending.amount + this.available.amount + this.disputed.amount;
 });
 
-fundSchema.virtual('client_visible_amount').get(function() {
+fundSchema.virtual('client_visible_amount').get(function () {
   return this.in_escrow.amount + this.released.amount + this.disputed.amount;
 });
 
-fundSchema.methods.addToEscrow = function(amount) {
+fundSchema.methods.addToEscrow = function (amount) {
   this.in_escrow.amount += amount;
   this.in_escrow.date = new Date();
 };
 
-fundSchema.methods.releaseFromEscrow = function(amount) {
+fundSchema.methods.releaseFromEscrow = function (amount) {
   if (this.in_escrow.amount < amount) {
     throw new Error('Insufficient funds in escrow');
   }
-  
+
   // Move from escrow to released (for client view)
   this.in_escrow.amount -= amount;
   this.released.amount += amount;
   this.released.date = new Date();
-  
+
   // Also add to pending (for contractor view)
   this.pending.amount += amount;
   this.pending.date = new Date();
 };
 
-fundSchema.methods.makePendingAvailable = function(amount) {
+fundSchema.methods.makePendingAvailable = function (amount) {
   if (this.pending.amount < amount) {
     throw new Error('Insufficient pending funds');
   }
-  
+
   // Move from pending to available
   this.pending.amount -= amount;
   this.available.amount += amount;
   this.available.date = new Date();
 };
 
-fundSchema.methods.withdrawFromAvailable = function(amount) {
+fundSchema.methods.withdrawFromAvailable = function (amount) {
   if (this.available.amount < amount) {
     throw new Error('Insufficient available funds');
   }
-  
+
   this.available.amount -= amount;
   if (this.available.amount === 0) {
     this.available.date = new Date();
   }
 };
 
-fundSchema.methods.moveToDisputed = function(amount, fromStatus) {
+fundSchema.methods.moveToDisputed = function (amount, fromStatus) {
   const validStatuses = ['in_escrow', 'pending', 'available'];
   if (!validStatuses.includes(fromStatus)) {
     throw new Error('Invalid source status for dispute');
   }
-  
+
   if (this[fromStatus].amount < amount) {
     throw new Error(`Insufficient funds in ${fromStatus}`);
   }
-  
+
   this[fromStatus].amount -= amount;
   this.disputed.amount += amount;
   this.disputed.date = new Date();
 };
 
 // Virtual for checking if fund is overdue
-fundSchema.virtual('is_overdue').get(function() {
-  return this.due_date && this.due_date < new Date() && 
-         ![FUND_STATUS.RELEASED, FUND_STATUS.IN_DISPUTE].includes(this.status);
+fundSchema.virtual('is_overdue').get(function () {
+  return this.due_date && this.due_date < new Date() &&
+    ![FUND_STATUS.RELEASED, FUND_STATUS.IN_DISPUTE].includes(this.status);
 });
 
 // Virtual for checking if delay period is active
-fundSchema.virtual('is_delayed').get(function() {
+fundSchema.virtual('is_delayed').get(function () {
   return this.delay_until && this.delay_until > new Date();
 });
 
 // Virtual for checking if delay has expired
-fundSchema.virtual('delay_expired').get(function() {
+fundSchema.virtual('delay_expired').get(function () {
   return this.delay_until && this.delay_until <= new Date();
 });
 
 // Instance methods
-fundSchema.methods.canRelease = function() {
+fundSchema.methods.canRelease = function () {
   // Cannot release if delayed and delay hasn't expired
   if (this.is_delayed) return false;
   return [FUND_STATUS.PENDING_REVIEW, FUND_STATUS.IN_REVIEW].includes(this.status);
 };
 
-fundSchema.methods.canDispute = function() {
+fundSchema.methods.canDispute = function () {
   return ![FUND_STATUS.RELEASED, FUND_STATUS.IN_DISPUTE].includes(this.status);
 };
 
-fundSchema.methods.setDelay = function(adminId, days, reason) {
+fundSchema.methods.setDelay = function (adminId, days, reason) {
   this.delay_until = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
   this.delay_reason = reason;
   this.delayed_by = adminId;
   this.delay_set_at = new Date();
 };
 
-fundSchema.methods.clearDelay = function() {
+fundSchema.methods.clearDelay = function () {
   this.delay_until = undefined;
   this.delay_reason = undefined;
   this.delayed_by = undefined;
@@ -254,7 +254,7 @@ const escrowAccountSchema = new Schema({
     min: [0, 'Balance cannot be negative'],
     default: 0,
     validate: {
-      validator: function(v) {
+      validator: function (v) {
         return Number.isFinite(v) && v >= 0;
       },
       message: 'Balance must be a valid non-negative number'
@@ -294,22 +294,22 @@ const escrowAccountSchema = new Schema({
 });
 
 // Virtual for available balance (excluding frozen funds)
-escrowAccountSchema.virtual('available_balance').get(function() {
+escrowAccountSchema.virtual('available_balance').get(function () {
   return this.frozen ? 0 : this.balance;
 });
 
 // Instance methods
-escrowAccountSchema.methods.hasSufficientBalance = function(amount) {
+escrowAccountSchema.methods.hasSufficientBalance = function (amount) {
   return this.available_balance >= amount;
 };
 
-escrowAccountSchema.methods.addFunds = function(amount) {
+escrowAccountSchema.methods.addFunds = function (amount) {
   this.balance += amount;
   this.total_funded += amount;
   this.last_funded_at = new Date();
 };
 
-escrowAccountSchema.methods.deductFunds = function(amount) {
+escrowAccountSchema.methods.deductFunds = function (amount) {
   if (!this.hasSufficientBalance(amount)) {
     throw new Error('Insufficient balance');
   }
@@ -335,7 +335,7 @@ const transactionSchema = new Schema({
     type: Number,
     required: true,
     validate: {
-      validator: function(v) {
+      validator: function (v) {
         return Number.isFinite(v) && v !== 0;
       },
       message: 'Amount must be a valid non-zero number'
@@ -378,17 +378,17 @@ transactionSchema.index({ fund_id: 1, timestamp: -1 });
 transactionSchema.index({ timestamp: -1 });
 
 // Virtual for net amount (amount minus fees)
-transactionSchema.virtual('net_amount').get(function() {
+transactionSchema.virtual('net_amount').get(function () {
   return this.amount - this.fee_amount;
 });
 
 // Instance methods
-transactionSchema.methods.markCompleted = function() {
+transactionSchema.methods.markCompleted = function () {
   this.status = TRANSACTION_STATUS.COMPLETED;
   this.processed_at = new Date();
 };
 
-transactionSchema.methods.markFailed = function(reason) {
+transactionSchema.methods.markFailed = function (reason) {
   this.status = TRANSACTION_STATUS.FAILED;
   this.failed_reason = reason;
   this.processed_at = new Date();
@@ -506,12 +506,12 @@ disputeSchema.index({ initiator_id: 1, status: 1 });
 disputeSchema.index({ assigned_admin: 1, status: 1 });
 
 // Virtual for dispute age
-disputeSchema.virtual('age_in_days').get(function() {
+disputeSchema.virtual('age_in_days').get(function () {
   return Math.floor((new Date() - this.created_at) / (1000 * 60 * 60 * 24));
 });
 
 // Instance methods
-disputeSchema.methods.resolve = function(resolutionType, clientAmount, freelancerAmount, notes) {
+disputeSchema.methods.resolve = function (resolutionType, clientAmount, freelancerAmount, notes) {
   this.status = DISPUTE_STATUS.RESOLVED;
   this.resolution_type = resolutionType;
   this.resolution_amount_client = clientAmount;
@@ -520,7 +520,7 @@ disputeSchema.methods.resolve = function(resolutionType, clientAmount, freelance
   this.resolved_at = new Date();
 };
 
-disputeSchema.methods.addMessage = function(senderId, message, isAdmin = false) {
+disputeSchema.methods.addMessage = function (senderId, message, isAdmin = false) {
   this.messages.push({
     sender_id: senderId,
     message: message,
@@ -533,7 +533,7 @@ disputeSchema.methods.addMessage = function(senderId, message, isAdmin = false) 
 // ========================================
 
 // Fund pre-save middleware
-fundSchema.pre('save', function(next) {
+fundSchema.pre('save', function (next) {
   // Set timestamps for status changes
   if (this.isModified('status')) {
     const now = new Date();
@@ -558,7 +558,7 @@ fundSchema.pre('save', function(next) {
 // Transaction pre-save middleware
 
 
-transactionSchema.pre('save', function(next) {
+transactionSchema.pre('save', function (next) {
   if (this.isModified('status') && this.status === TRANSACTION_STATUS.COMPLETED) {
     this.processed_at = new Date();
   }
@@ -574,7 +574,7 @@ const Transaction = mongoose.model('Transaction', transactionSchema);
 const Dispute = mongoose.model('Dispute', disputeSchema);
 
 // Export models and enums
-export  {
+export {
   Fund,
   EscrowAccount,
   Transaction,
@@ -678,23 +678,23 @@ const adminPermissionSchema = new Schema({
     can_release_funds: { type: Boolean, default: false },
     can_freeze_funds: { type: Boolean, default: false },
     max_fund_amount: { type: Number, default: 0 }, // Maximum amount they can handle
-    
+
     // Escrow permissions
     can_freeze_accounts: { type: Boolean, default: false },
     can_adjust_balances: { type: Boolean, default: false },
     can_view_all_accounts: { type: Boolean, default: false },
-    
+
     // Dispute permissions
     can_assign_disputes: { type: Boolean, default: true },
     can_resolve_disputes: { type: Boolean, default: false },
     can_escalate_disputes: { type: Boolean, default: true },
     max_dispute_amount: { type: Number, default: 1000 },
-    
+
     // Transaction permissions
     can_reverse_transactions: { type: Boolean, default: false },
     can_create_manual_transactions: { type: Boolean, default: false },
     can_view_all_transactions: { type: Boolean, default: false },
-    
+
     // System permissions
     can_modify_admin_notes: { type: Boolean, default: true },
     can_access_audit_logs: { type: Boolean, default: false },
@@ -725,9 +725,9 @@ const adminPermissionSchema = new Schema({
 });
 
 // Admin permission methods
-adminPermissionSchema.methods.canPerformAction = function(action, amount = 0) {
+adminPermissionSchema.methods.canPerformAction = function (action, amount = 0) {
   if (!this.is_active) return false;
-  
+
   const perms = this.permissions;
   switch (action) {
     case 'modify_fund':
@@ -743,17 +743,17 @@ adminPermissionSchema.methods.canPerformAction = function(action, amount = 0) {
   }
 };
 
-adminPermissionSchema.methods.isWithinTimeRestrictions = function() {
+adminPermissionSchema.methods.isWithinTimeRestrictions = function () {
   if (!this.restrictions.time_restrictions.allowed_hours) return true;
-  
+
   const now = new Date();
   const currentHour = now.getHours();
   const currentDay = now.getDay();
-  
+
   const { start, end } = this.restrictions.time_restrictions.allowed_hours;
   const hourAllowed = start <= currentHour && currentHour <= end;
   const dayAllowed = this.restrictions.time_restrictions.allowed_days.includes(currentDay);
-  
+
   return hourAllowed && dayAllowed;
 };
 
@@ -762,11 +762,11 @@ adminPermissionSchema.methods.isWithinTimeRestrictions = function() {
 // ========================================
 
 // Add admin methods to Fund schema
-fundSchema.methods.adminUpdateStatus = function(adminId, newStatus, reason, notes) {
+fundSchema.methods.adminUpdateStatus = function (adminId, newStatus, reason, notes) {
   const previousStatus = this.status;
   this.status = newStatus;
   this.admin_notes = notes || this.admin_notes;
-  
+
   // Log the admin action
   return new AdminAction({
     admin_id: adminId,
@@ -780,14 +780,14 @@ fundSchema.methods.adminUpdateStatus = function(adminId, newStatus, reason, note
   });
 };
 
-fundSchema.methods.adminRelease = async function(adminId, reason) {
+fundSchema.methods.adminRelease = async function (adminId, reason) {
   if (!this.canRelease()) {
     throw new Error('Fund cannot be released in current status or is delayed');
   }
-  
+
   const actionLog = this.adminUpdateStatus(adminId, FUND_STATUS.RELEASED, reason);
   await actionLog.save();
-  
+
   // Create release transaction
   const transaction = new Transaction({
     fund_id: this._id,
@@ -796,20 +796,20 @@ fundSchema.methods.adminRelease = async function(adminId, reason) {
     status: TRANSACTION_STATUS.COMPLETED,
     notes: `Admin release: ${reason}`
   });
-  
+
   await transaction.save();
   await this.save();
-  
+
   return { fund: this, transaction, adminAction: actionLog };
 };
 
-fundSchema.methods.adminDelayWithdrawal = function(adminId, days, reason) {
+fundSchema.methods.adminDelayWithdrawal = function (adminId, days, reason) {
   if (this.status !== FUND_STATUS.IN_REVIEW) {
     throw new Error('Can only delay funds that are in review');
   }
-  
+
   this.setDelay(adminId, days, reason);
-  
+
   return new AdminAction({
     admin_id: adminId,
     action_type: 'withdrawal_delay',
@@ -823,10 +823,10 @@ fundSchema.methods.adminDelayWithdrawal = function(adminId, days, reason) {
 };
 
 // Add admin methods to EscrowAccount schema
-escrowAccountSchema.methods.adminFreeze = function(adminId, reason) {
+escrowAccountSchema.methods.adminFreeze = function (adminId, reason) {
   this.frozen = true;
   this.freeze_reason = reason;
-  
+
   return new AdminAction({
     admin_id: adminId,
     action_type: 'account_freeze',
@@ -838,10 +838,10 @@ escrowAccountSchema.methods.adminFreeze = function(adminId, reason) {
   });
 };
 
-escrowAccountSchema.methods.adminAdjustBalance = function(adminId, amount, reason) {
+escrowAccountSchema.methods.adminAdjustBalance = function (adminId, amount, reason) {
   const previousBalance = this.balance;
   this.balance += amount; // amount can be negative for deductions
-  
+
   return new AdminAction({
     admin_id: adminId,
     action_type: 'system_adjustment',
@@ -854,9 +854,9 @@ escrowAccountSchema.methods.adminAdjustBalance = function(adminId, amount, reaso
 };
 
 // Add admin methods to Dispute schema
-disputeSchema.methods.adminAssign = function(adminId, assignToAdminId) {
+disputeSchema.methods.adminAssign = function (adminId, assignToAdminId) {
   this.assigned_admin = assignToAdminId;
-  
+
   return new AdminAction({
     admin_id: adminId,
     action_type: 'dispute_assignment',
@@ -868,17 +868,17 @@ disputeSchema.methods.adminAssign = function(adminId, assignToAdminId) {
   });
 };
 
-disputeSchema.methods.adminResolve = function(adminId, resolutionType, clientAmount, freelancerAmount, notes) {
+disputeSchema.methods.adminResolve = function (adminId, resolutionType, clientAmount, freelancerAmount, notes) {
   const previousStatus = this.status;
   this.resolve(resolutionType, clientAmount, freelancerAmount, notes);
-  
+
   return new AdminAction({
     admin_id: adminId,
     action_type: 'dispute_resolution',
     target_type: 'dispute',
     target_id: this._id,
     previous_state: { status: previousStatus },
-    new_state: { 
+    new_state: {
       status: DISPUTE_STATUS.RESOLVED,
       resolution_type: resolutionType,
       resolution_amount_client: clientAmount,

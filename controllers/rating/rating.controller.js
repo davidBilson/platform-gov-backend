@@ -4,7 +4,7 @@ import User from '../../models/user.model.js';
 
 const canRate = async (contractId, reviewerId) => {
   const contract = await Contract.findById(contractId);
-  
+
   if (!contract) {
     return { canRate: false, message: 'Contract not found' };
   }
@@ -26,8 +26,8 @@ const canRate = async (contractId, reviewerId) => {
 
 // Create a new rating
 export const createRating = async (req, res) => {
-  
-    try {
+
+  try {
     const { contractId, jobId, reviewee, reviewer, role, rating, comments } = req.body;
 
     // Validate required fields
@@ -99,9 +99,9 @@ export const getUserRatings = async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching user ratings:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: error.message 
+      message: error.message
     });
   }
 };
@@ -132,7 +132,7 @@ export const getRatingById = async (req, res) => {
 export const getContractRatings = async (req, res) => {
   try {
     const contractId = req.params.id;
-    
+
     const ratings = await Rating.find({ contractId: contractId })
       .populate('reviewer', 'name')
       .populate('reviewee', 'name');
@@ -148,7 +148,7 @@ export const getJobRatings = async (req, res) => {
   try {
     const jobId = req.params.id;
     const { page = 1, limit = 10 } = req.query;
- 
+
     const options = {
       page: parseInt(page),
       limit: parseInt(limit),
@@ -170,12 +170,12 @@ export const getJobRatings = async (req, res) => {
 // Helper function to update contractor's average rating
 const updateContractorRating = async (contractorId) => {
   const ratings = await Rating.find({ reviewee: contractorId, role: 'contractor' });
-  
+
   if (ratings.length > 0) {
-    
+
     const totalRatings = ratings.reduce((sum, rating) => sum + rating.rating, 0);
     const averageRating = totalRatings / ratings.length;
-    
+
     await User.findByIdAndUpdate(contractorId, {
       averageRating: parseFloat(averageRating.toFixed(2)),
       ratingCount: ratings.length

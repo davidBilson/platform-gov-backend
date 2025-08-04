@@ -57,7 +57,7 @@ ratingSchema.index({ role: 1 });
 ratingSchema.index({ rating: 1 });
 
 // Document middleware
-ratingSchema.pre('save', function(next) {
+ratingSchema.pre('save', function (next) {
   this.updatedAt = Date.now();
   next();
 });

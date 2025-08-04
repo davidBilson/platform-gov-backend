@@ -8,7 +8,7 @@ export const createHiringOffer = async (req, res) => {
   try {
     // req.file is now available from the Multer middleware
     const file = req.file;
-    
+
     // Parse the text fields from form-data
     const {
       jobId,
@@ -47,7 +47,7 @@ export const createHiringOffer = async (req, res) => {
           null,
           file.originalname
         );
-    
+
         uploadedDocuments.push({
           url: uploadResult.secure_url,
           publicId: uploadResult.public_id,
@@ -58,9 +58,9 @@ export const createHiringOffer = async (req, res) => {
         });
       } catch (uploadError) {
         console.error('Detailed upload error:', uploadError);
-        return res.status(500).json({ 
+        return res.status(500).json({
           error: 'Failed to upload document',
-          details: uploadError.message 
+          details: uploadError.message
         });
       }
     }
@@ -145,8 +145,8 @@ export const getHiringOffer = async (req, res) => {
 
     // Validate all required fields exist
     if (!jobId || !applicationId) {
-      return res.status(400).json({ 
-        error: 'Missing required fields. Please provide jobId, and applicationId' 
+      return res.status(400).json({
+        error: 'Missing required fields. Please provide jobId, and applicationId'
       });
     }
 
@@ -160,14 +160,14 @@ export const getHiringOffer = async (req, res) => {
       jobId,
       applicationId,
     })
-    .populate('jobId', 'title description')
-    .populate('clientId', 'firstName lastName email')
-    .populate('contractorId', 'firstName lastName email')
-    .populate('applicationId', 'coverLetter');
+      .populate('jobId', 'title description')
+      .populate('clientId', 'firstName lastName email')
+      .populate('contractorId', 'firstName lastName email')
+      .populate('applicationId', 'coverLetter');
 
     if (!hiringOffer) {
-      return res.status(404).json({ 
-        error: 'Hiring offer not found or you are not authorized to view this offer' 
+      return res.status(404).json({
+        error: 'Hiring offer not found or you are not authorized to view this offer'
       });
     }
 
@@ -193,9 +193,9 @@ export const deleteHiringDocuments = async (hiringId) => {
     if (!hiring || !hiring.documents || hiring.documents.length === 0) {
       return;
     }
-    
+
     const { deleteFile } = require('../utils/cloudinary.js');
-    
+
     const deletePromises = hiring.documents.map(doc => {
       if (doc.publicId) {
         const resourceType = doc.resourceType || 'image';
@@ -203,7 +203,7 @@ export const deleteHiringDocuments = async (hiringId) => {
       }
       return Promise.resolve();
     });
-    
+
     await Promise.all(deletePromises);
   } catch (error) {
     console.error('Error deleting hiring documents:', error);
@@ -300,10 +300,10 @@ export const getClientHiringOffers = async (req, res) => {
       .sort({ createdAt: -1 }); // Sort by newest first
 
     if (!hiringOffers || hiringOffers.length === 0) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: true,
         data: [],
-        message: 'No hiring offers found for this client' 
+        message: 'No hiring offers found for this client'
       });
     }
 

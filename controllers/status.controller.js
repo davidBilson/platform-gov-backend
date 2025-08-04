@@ -59,12 +59,12 @@ export const trackHiringStatus = async (req, res) => {
     const hiringRecord = await Hiring.findOne(query);
 
     if (!hiringRecord) {
-      return res.status(404).json({ 
-        success: true, 
-        data: { 
+      return res.status(404).json({
+        success: true,
+        data: {
           hiringStatus: 'not_offered',
-          message: 'No hiring record found for this job' 
-        } 
+          message: 'No hiring record found for this job'
+        }
       });
     }
 
@@ -94,9 +94,9 @@ export const trackJobApplicationStatus = async (req, res) => {
     const { jobId, freelancerId, applicationId } = req.body;
 
     if (!jobId && !applicationId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Either jobId or applicationId is required' 
+      return res.status(400).json({
+        success: false,
+        message: 'Either jobId or applicationId is required'
       });
     }
 
@@ -112,12 +112,12 @@ export const trackJobApplicationStatus = async (req, res) => {
       .select('status viewedAt interviews clientNotes updatedAt');
 
     if (!application) {
-      return res.status(404).json({ 
-        success: true, 
-        data: { 
+      return res.status(404).json({
+        success: true,
+        data: {
           applicationStatus: 'not_applied',
-          message: 'No application found' 
-        } 
+          message: 'No application found'
+        }
       });
     }
 
@@ -147,19 +147,19 @@ export const updateJobApplicationStatus = async (req, res) => {
     const { applicationId, status } = req.body;
 
     if (!applicationId || !status) {
-        return res.status(400).json({ 
-            success: false, 
-            message: 'Application ID and status are required' 
-        });
+      return res.status(400).json({
+        success: false,
+        message: 'Application ID and status are required'
+      });
     }
 
     // Validate status
     const validStatuses = ['draft', 'pending', 'viewed', 'active'];
     if (!validStatuses.includes(status)) {
-        console.error('Invalid status value:', status);
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid status value' 
+      console.error('Invalid status value:', status);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status value'
       });
     }
 
@@ -177,9 +177,9 @@ export const updateJobApplicationStatus = async (req, res) => {
     ).select('status clientNotes viewedAt updatedAt');
 
     if (!updatedApplication) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Application not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'Application not found'
       });
     }
 
@@ -195,10 +195,10 @@ export const updateJobApplicationStatus = async (req, res) => {
     });
   } catch (error) {
     console.error('Error updating job application status:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Server error while updating application status',
-      error: error.message 
+      error: error.message
     });
   }
 };

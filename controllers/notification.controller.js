@@ -17,17 +17,17 @@ const createNotification = async (io, { userId, title, message, type, link = nul
       type,
       link
     });
-    
+
     const savedNotification = await notification.save();
     const notificationData = {
       ...savedNotification.toObject(),
       id: savedNotification._id.toString(),
       createdAt: savedNotification.createdAt
     };
-    
+
     // Emit to user's personal room
     io.to(userId.toString()).emit('new-notification', notificationData);
-    
+
     console.log(`Notification sent to user ${userId}:`, notificationData.title);
     return savedNotification;
   } catch (error) {
@@ -46,17 +46,17 @@ export const setupNotificationWatchers = (io) => {
   }
 
   console.log('Setting up notification watchers...');
-  
+
   // Watch User collection for new users
-  const userWatcher = User.watch([], { 
+  const userWatcher = User.watch([], {
     fullDocument: 'updateLookup',
     fullDocumentBeforeChange: 'whenAvailable'
   });
-  
+
   userWatcher.on('change', async (change) => {
     if (change.operationType === 'insert') {
       const newUser = change.fullDocument;
-      
+
       try {
         await createNotification(io, {
           userId: newUser._id,
@@ -84,12 +84,12 @@ export const setupNotificationWatchers = (io) => {
   ratingWatcher.on('change', async (change) => {
     if (change.operationType === 'insert') {
       const newRating = change.fullDocument;
-      
+
       try {
         // Fetch reviewer data separately
         const reviewer = await User.findById(newRating.reviewer).select('name');
         const reviewerName = reviewer?.name || 'a user';
-        
+
         await createNotification(io, {
           userId: newRating.reviewee,
           title: 'New Rating Received',
@@ -116,12 +116,12 @@ export const setupNotificationWatchers = (io) => {
   messageWatcher.on('change', async (change) => {
     if (change.operationType === 'insert') {
       const newMessage = change.fullDocument;
-      
+
       try {
         // Fetch sender data separately
         const sender = await User.findById(newMessage.sender).select('name');
         const senderName = sender?.name || 'a user';
-        
+
         await createNotification(io, {
           userId: newMessage.recipient,
           title: 'New Message',
@@ -141,7 +141,7 @@ export const setupNotificationWatchers = (io) => {
       $match: {
         $or: [
           { operationType: 'insert' },
-          { 
+          {
             operationType: 'update',
             'updateDescription.updatedFields.status': { $exists: true }
           }
@@ -157,7 +157,7 @@ export const setupNotificationWatchers = (io) => {
       if (change.operationType === 'insert') {
         // Skip draft applications
         if (application.status === 'draft') return;
-        
+
         // Fetch related data separately
         const [jobData, freelancerData] = await Promise.all([
           Job.findById(application.jobId).select('jobTitle userId'),
@@ -178,11 +178,11 @@ export const setupNotificationWatchers = (io) => {
 
       if (change.operationType === 'update') {
         const status = change.updateDescription?.updatedFields?.status;
-        
+
         if (status === 'viewed' || status === 'active') {
           // Fetch job data separately
           const jobData = await Job.findById(application.jobId).select('jobTitle');
-          
+
           if (status === 'viewed') {
             await createNotification(io, {
               userId: application.freelancerId,
@@ -192,7 +192,7 @@ export const setupNotificationWatchers = (io) => {
               link: `/jobs/${jobData?._id}`
             });
           }
-          
+
           if (status === 'active') {
             await createNotification(io, {
               userId: application.freelancerId,
@@ -216,7 +216,7 @@ export const setupNotificationWatchers = (io) => {
       $match: {
         $or: [
           { operationType: 'insert' },
-          { 
+          {
             operationType: 'update',
             'updateDescription.updatedFields.status': { $exists: true }
           }
@@ -232,7 +232,7 @@ export const setupNotificationWatchers = (io) => {
       if (change.operationType === 'insert') {
         // Fetch client data separately
         const clientData = await User.findById(hiring.clientId).select('name');
-        
+
         await createNotification(io, {
           userId: hiring.contractorId,
           title: 'New Offer Received',
@@ -241,14 +241,14 @@ export const setupNotificationWatchers = (io) => {
           link: `/contracts/${hiring._id}`
         });
       }
-      
+
       if (change.operationType === 'update') {
         const status = change.updateDescription?.updatedFields?.status;
-        
+
         if (status === 'accepted' || status === 'declined') {
           // Fetch contractor data separately
           const contractorData = await User.findById(hiring.contractorId).select('name');
-          
+
           if (status === 'accepted') {
             await createNotification(io, {
               userId: hiring.clientId,
@@ -258,7 +258,7 @@ export const setupNotificationWatchers = (io) => {
               link: `/contracts/${hiring._id}`
             });
           }
-          
+
           if (status === 'declined') {
             await createNotification(io, {
               userId: hiring.clientId,
@@ -290,14 +290,14 @@ export const setupNotificationWatchers = (io) => {
     try {
       const contract = change.fullDocument;
       const updatedFields = change.updateDescription?.updatedFields;
-      
+
       // Check for milestone updates
       for (const [key, value] of Object.entries(updatedFields)) {
         if (key.includes('milestones') && key.includes('status')) {
           // Fetch user data separately when needed
           if (value === 'completed') {
             const contractorData = await User.findById(contract.contractorId).select('name');
-            
+
             await createNotification(io, {
               userId: contract.clientId,
               title: 'Milestone Completed',
@@ -306,7 +306,7 @@ export const setupNotificationWatchers = (io) => {
               link: `/contracts/${contract._id}`
             });
           }
-          
+
           if (value === 'approved') {
             await createNotification(io, {
               userId: contract.contractorId,
@@ -316,10 +316,10 @@ export const setupNotificationWatchers = (io) => {
               link: `/contracts/${contract._id}`
             });
           }
-          
+
           if (value === 'disputed') {
             const contractorData = await User.findById(contract.contractorId).select('name');
-            
+
             await createNotification(io, {
               userId: contract.clientId,
               title: 'Milestone Disputed',
@@ -351,7 +351,7 @@ export const getNotifications = async (req, res) => {
     const notifications = await Notification.find({ userId })
       .sort({ createdAt: -1 })
       .limit(50); // Limit to prevent large responses
-    
+
     res.json(notifications);
   } catch (error) {
     console.error('Error fetching notifications:', error);
@@ -367,11 +367,11 @@ export const markAsRead = async (req, res) => {
       { isRead: true },
       { new: true }
     );
-    
+
     if (!notification) {
       return res.status(404).json({ message: 'Notification not found' });
     }
-    
+
     res.json(notification);
   } catch (error) {
     console.error('Error marking notification as read:', error);
@@ -382,19 +382,19 @@ export const markAsRead = async (req, res) => {
 export const markAllAsRead = async (req, res) => {
   try {
     const { userId } = req.body; // Get userId from request body
-    
+
     if (!userId) {
       return res.status(400).json({ message: 'User ID is required' });
     }
-    
+
     const result = await Notification.updateMany(
       { userId, isRead: false },
       { $set: { isRead: true } }
     );
-    
-    res.json({ 
-      success: true, 
-      modifiedCount: result.modifiedCount 
+
+    res.json({
+      success: true,
+      modifiedCount: result.modifiedCount
     });
   } catch (error) {
     console.error('Error marking all notifications as read:', error);
@@ -405,16 +405,16 @@ export const markAllAsRead = async (req, res) => {
 export const getUnreadCount = async (req, res) => {
   try {
     const { userId } = req.query; // Get userId from query params
-    
+
     if (!userId) {
       return res.status(400).json({ message: 'User ID is required' });
     }
-    
-    const count = await Notification.countDocuments({ 
-      userId, 
-      isRead: false 
+
+    const count = await Notification.countDocuments({
+      userId,
+      isRead: false
     });
-    
+
     res.json({ count });
   } catch (error) {
     console.error('Error getting unread count:', error);
@@ -426,11 +426,11 @@ export const deleteNotification = async (req, res) => {
   try {
     const { id } = req.params;
     const notification = await Notification.findByIdAndDelete(id);
-    
+
     if (!notification) {
       return res.status(404).json({ message: 'Notification not found' });
     }
-    
+
     res.json({ success: true });
   } catch (error) {
     console.error('Error deleting notification:', error);

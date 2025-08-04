@@ -4,15 +4,15 @@ import Contract from '../../models/contract.model.js';
 /**
  * Start a retainer contract as a client
  */
-export const startRetainer = async function(req, res) {
+export const startRetainer = async function (req, res) {
   try {
     const contractId = req.params.id;
     const userId = req.body.userId;
 
     if (!mongoose.Types.ObjectId.isValid(contractId)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid contract ID format' 
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid contract ID format'
       });
     }
 
@@ -23,16 +23,16 @@ export const startRetainer = async function(req, res) {
     }).populate('jobId');
 
     if (!contract) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Contract not found or unauthorized' 
+      return res.status(404).json({
+        success: false,
+        message: 'Contract not found or unauthorized'
       });
     }
 
     if (contract.retainer && contract.retainer.startDate) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Retainer already started' 
+      return res.status(400).json({
+        success: false,
+        message: 'Retainer already started'
       });
     }
 
@@ -61,10 +61,10 @@ export const startRetainer = async function(req, res) {
 
   } catch (error) {
     console.error('Error starting retainer:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Error starting retainer contract',
-      error: error.message 
+      error: error.message
     });
   }
 };
@@ -72,23 +72,23 @@ export const startRetainer = async function(req, res) {
 /**
  * Submit work summary as a contractor
  */
-export const submitWorkSummary = async function(req, res) {
+export const submitWorkSummary = async function (req, res) {
   try {
     const contractId = req.params.id;
     const summaryText = req.body.summaryText;
     const userId = req.body.userId;
 
     if (!mongoose.Types.ObjectId.isValid(contractId)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid contract ID format' 
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid contract ID format'
       });
     }
 
     if (!summaryText || summaryText === '') {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Work summary text is required' 
+      return res.status(400).json({
+        success: false,
+        message: 'Work summary text is required'
       });
     }
 
@@ -99,16 +99,16 @@ export const submitWorkSummary = async function(req, res) {
     });
 
     if (!contract) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Contract not found or unauthorized' 
+      return res.status(404).json({
+        success: false,
+        message: 'Contract not found or unauthorized'
       });
     }
 
     if (!contract.retainer || !contract.retainer.startDate) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Retainer not started yet' 
+      return res.status(400).json({
+        success: false,
+        message: 'Retainer not started yet'
       });
     }
 
@@ -135,10 +135,10 @@ export const submitWorkSummary = async function(req, res) {
 
   } catch (error) {
     console.error('Error submitting work summary:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Error submitting work summary',
-      error: error.message 
+      error: error.message
     });
   }
 };
@@ -146,15 +146,15 @@ export const submitWorkSummary = async function(req, res) {
 /**
  * Get retainer details for both client and contractor
  */
-export const getRetainerDetails = async function(req, res) {
+export const getRetainerDetails = async function (req, res) {
   try {
     const contractId = req.params.id;
     const userId = req.body.userId;
 
     if (!mongoose.Types.ObjectId.isValid(contractId)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid contract ID format' 
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid contract ID format'
       });
     }
 
@@ -165,9 +165,9 @@ export const getRetainerDetails = async function(req, res) {
     });
 
     if (!contract) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Contract not found or unauthorized' 
+      return res.status(404).json({
+        success: false,
+        message: 'Contract not found or unauthorized'
       });
     }
 
@@ -209,10 +209,10 @@ export const getRetainerDetails = async function(req, res) {
 
   } catch (error) {
     console.error('Error getting retainer details:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Error retrieving retainer details',
-      error: error.message 
+      error: error.message
     });
   }
 };
@@ -224,9 +224,9 @@ function calculateNextPaymentDate(startDate, frequency) {
   if (!startDate || !frequency) {
     throw new Error('Start date and frequency are required');
   }
-  
+
   const nextDate = new Date(startDate);
-  
+
   switch (frequency) {
     case 'weekly':
       nextDate.setDate(nextDate.getDate() + 7);
@@ -240,6 +240,6 @@ function calculateNextPaymentDate(startDate, frequency) {
     default:
       throw new Error(`Invalid frequency: ${frequency}`);
   }
-  
+
   return nextDate;
 }

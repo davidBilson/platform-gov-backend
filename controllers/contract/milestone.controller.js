@@ -7,9 +7,9 @@ export const addMilestone = async (req, res) => {
     const { name, description, dueDate, amount, userId } = req.body;
 
     if (!userId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'User ID is required' 
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
       });
     }
 
@@ -20,9 +20,9 @@ export const addMilestone = async (req, res) => {
     });
 
     if (!contract) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Contract not found or invalid payment structure' 
+      return res.status(404).json({
+        success: false,
+        message: 'Contract not found or invalid payment structure'
       });
     }
 
@@ -46,10 +46,10 @@ export const addMilestone = async (req, res) => {
 
   } catch (error) {
     console.error('Error adding milestone:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Server error adding milestone',
-      error: error.message 
+      error: error.message
     });
   }
 };
@@ -64,9 +64,9 @@ export const getMilestones = async (req, res) => {
     });
 
     if (!contract) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Contract not found or unauthorized' 
+      return res.status(404).json({
+        success: false,
+        message: 'Contract not found or unauthorized'
       });
     }
 
@@ -78,10 +78,10 @@ export const getMilestones = async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching milestones:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Server error fetching milestones',
-      error: error.message 
+      error: error.message
     });
   }
 };
@@ -97,24 +97,24 @@ export const completeMilestone = async (req, res) => {
     });
 
     if (!contract) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Contract not found or invalid payment structure' 
+      return res.status(404).json({
+        success: false,
+        message: 'Contract not found or invalid payment structure'
       });
     }
 
     const milestone = contract.milestones.id(milestoneId);
     if (!milestone) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Milestone not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'Milestone not found'
       });
     }
 
     if (milestone.status !== 'pending') {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Milestone cannot be marked as completed in its current state' 
+      return res.status(400).json({
+        success: false,
+        message: 'Milestone cannot be marked as completed in its current state'
       });
     }
 
@@ -130,10 +130,10 @@ export const completeMilestone = async (req, res) => {
 
   } catch (error) {
     console.error('Error completing milestone:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Server error completing milestone',
-      error: error.message 
+      error: error.message
     });
   }
 };
@@ -150,25 +150,25 @@ export const approveMilestone = async (req, res) => {
     });
 
     if (!contract) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Contract not found or invalid payment structure' 
+      return res.status(404).json({
+        success: false,
+        message: 'Contract not found or invalid payment structure'
       });
     }
 
     // Find and update milestone
     const milestone = contract.milestones.id(milestoneId);
     if (!milestone) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Milestone not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'Milestone not found'
       });
     }
 
     if (milestone.status !== 'completed') {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Only completed milestones can be approved' 
+      return res.status(400).json({
+        success: false,
+        message: 'Only completed milestones can be approved'
       });
     }
 
@@ -196,10 +196,10 @@ export const approveMilestone = async (req, res) => {
 
   } catch (error) {
     console.error('Error approving milestone:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Server error approving milestone',
-      error: error.message 
+      error: error.message
     });
   }
 };
@@ -215,24 +215,24 @@ export const markMilestonePaid = async (req, res) => {
 
     const contract = await Contract.findById(contractId);
     if (!contract || contract.paymentStructure !== 'milestone') {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Contract not found or invalid payment structure' 
+      return res.status(404).json({
+        success: false,
+        message: 'Contract not found or invalid payment structure'
       });
     }
 
     const milestone = contract.milestones.id(milestoneId);
     if (!milestone) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Milestone not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'Milestone not found'
       });
     }
 
     if (milestone.status !== 'approved') {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Only approved milestones can be marked as paid' 
+      return res.status(400).json({
+        success: false,
+        message: 'Only approved milestones can be marked as paid'
       });
     }
 
@@ -265,10 +265,10 @@ export const markMilestonePaid = async (req, res) => {
 
   } catch (error) {
     console.error('Error marking milestone as paid:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Server error marking milestone as paid',
-      error: error.message 
+      error: error.message
     });
   }
 };
@@ -292,24 +292,24 @@ export const disputeMilestone = async (req, res) => {
     });
 
     if (!contract) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Contract not found or unauthorized' 
+      return res.status(404).json({
+        success: false,
+        message: 'Contract not found or unauthorized'
       });
     }
 
     const milestone = contract.milestones.id(milestoneId);
     if (!milestone) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Milestone not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'Milestone not found'
       });
     }
 
     if (milestone.status === 'disputed') {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Milestone is already disputed' 
+      return res.status(400).json({
+        success: false,
+        message: 'Milestone is already disputed'
       });
     }
 
@@ -339,10 +339,10 @@ export const disputeMilestone = async (req, res) => {
 
   } catch (error) {
     console.error('Error disputing milestone:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Server error disputing milestone',
-      error: error.message 
+      error: error.message
     });
   }
 };
@@ -367,17 +367,17 @@ export const getMilestone = async (req, res) => {
     });
 
     if (!contract) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Contract not found or unauthorized' 
+      return res.status(404).json({
+        success: false,
+        message: 'Contract not found or unauthorized'
       });
     }
 
     const milestone = contract.milestones.id(milestoneId);
     if (!milestone) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Milestone not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'Milestone not found'
       });
     }
 
@@ -389,10 +389,10 @@ export const getMilestone = async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching milestone:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Server error fetching milestone',
-      error: error.message 
+      error: error.message
     });
   }
 };

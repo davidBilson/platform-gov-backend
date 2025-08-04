@@ -1027,11 +1027,11 @@ export const getRetainerContractPayments = async (req, res) => {
 
         // Prepare payment history with transaction details
         const paymentHistory = contract.retainer.paymentHistory.map(payment => {
-            const relatedTransaction = transactions.find(t => 
+            const relatedTransaction = transactions.find(t =>
                 t.stripeTransferId === payment.transactionId ||
                 t.stripePaymentIntentId === payment.transactionId
             );
-            
+
             return {
                 ...payment,
                 transactionDetails: relatedTransaction ? {

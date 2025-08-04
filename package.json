@@ -33,6 +33,7 @@
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "stripe": "^18.2.1",
-    "twilio": "^5.5.2"
+    "twilio": "^5.5.2",
+    "uuid": "^11.1.0"
   }
 }

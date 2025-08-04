@@ -99,12 +99,12 @@ const hiringSchema = new mongoose.Schema({
   timestamps: true
 });
 
-hiringSchema.pre('save', function(next) {
+hiringSchema.pre('save', function (next) {
   this.updatedAt = Date.now();
   next();
 });
 
-hiringSchema.path('offerDetails.employmentType').validate(function(value) {
+hiringSchema.path('offerDetails.employmentType').validate(function (value) {
   return ['Full-time', 'Part-time'].includes(value);
 }, 'Invalid employment type');
 

@@ -1,5 +1,3 @@
-// transaction history
-
 import mongoose from 'mongoose';
 
 const TransactionSchema = new mongoose.Schema({
@@ -12,19 +10,26 @@ const TransactionSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Jobs',
   },
+  subscriptionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Subscriptions', // your subscription model
+  },
   type: {
     type: String,
     enum: [
       'payment_method_added',
       'project_funding',
-      'payout_pending', //Funds in 5-day hold
+      'payout_pending',
       'payout_available',
-      'payout', // Funds withdrawn
+      'payout',
       'withdrawal',
       'refund',
       'dispute',
       'instant_payment_client',
-      'instant_payment_contractor'
+      'instant_payment_contractor',
+      'subscription_payment', 
+      'subscription_cancelled', 
+      'subscription_resumed' 
     ],
     required: true
   },
@@ -64,23 +69,11 @@ const TransactionSchema = new mongoose.Schema({
   stripeChargeId: String,
   stripeCustomerId: String,
   stripePayoutId: String,
+  stripeSubscriptionId: String, // ✅ new field
   description: String,
   metadata: mongoose.Schema.Types.Mixed,
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
 }, {
   timestamps: true
-});
-
-TransactionSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
-  next();
 });
 
 const Transaction = mongoose.model('Transactions', TransactionSchema);

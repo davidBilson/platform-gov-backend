@@ -52,7 +52,7 @@ const handleFileUploadError = (err, req, res, next) => {
 };
 
 // Routes with file upload middleware
-router.post('/send-hiring-offer', 
+router.post('/send-hiring-offer',
   upload.single('documents'), // Changed to single file upload
   handleFileUploadError,
   createHiringOffer

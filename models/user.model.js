@@ -21,7 +21,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Please provide a password'],
     minlength: 8,
-    select: false 
+    select: false
   },
   phoneNumber: {
     type: String,
@@ -45,6 +45,10 @@ const userSchema = new mongoose.Schema({
     default: false
   },
   isPhoneVerified: {
+    type: Boolean,
+    default: false
+  },
+  isSubscribed: { // if the user has an active subscription (premium or free) true or false
     type: Boolean,
     default: false
   },
@@ -83,11 +87,24 @@ const userSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
- 
-userSchema.pre('save', function(next) {
+
+userSchema.pre('save', function (next) {
   this.updatedAt = Date.now();
   next();
 });
+
+// Method to check subscription status from Subscription model
+userSchema.methods.checkSubscriptionStatus = async function () {
+  const Subscription = mongoose.model('Subscription');
+  const activeSubscription = await Subscription.findOne({
+    userId: this._id,
+    status: { $in: ['active', 'pending'] },
+    'subscriptionPeriod.endDate': { $gt: new Date() }
+  });
+
+  this.isSubscribed = !!activeSubscription;
+  return this.save();
+};
 
 const User = mongoose.model('User', userSchema);
 export default User;

@@ -1,6 +1,7 @@
 import express from 'express';
 import adminRoutes from './admin.routes.js';
 import paymentRoutes from './payment.routes.js';
+import subscriptionRoutes from './subscription.routes.js';
 import contentRoutes from './content.routes.js';
 import authRoutes from './auth.routes.js';
 import profileRoutes from './profile.routes.js';
@@ -20,6 +21,8 @@ const router = express.Router();
 router.use('/admin', adminRoutes);
 
 router.use('/payment', paymentRoutes);
+
+router.use('/subscription', subscriptionRoutes);
 
 router.use('/content', contentRoutes);
 

@@ -16,17 +16,17 @@ export const startWorkSession = async (req, res) => {
     });
 
     if (!contract) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Contract not found or invalid payment structure' 
+      return res.status(404).json({
+        success: false,
+        message: 'Contract not found or invalid payment structure'
       });
     }
 
     const activeSession = contract.timesheets.find(s => s.status === 'active');
     if (activeSession) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'You already have an active work session' 
+      return res.status(400).json({
+        success: false,
+        message: 'You already have an active work session'
       });
     }
 
@@ -47,10 +47,10 @@ export const startWorkSession = async (req, res) => {
 
   } catch (error) {
     console.error('Error starting work session:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Server error starting work session',
-      error: error.message 
+      error: error.message
     });
   }
 };
@@ -65,9 +65,9 @@ export const getTimesheetLogs = async (req, res) => {
     });
 
     if (!contract) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Contract not found or invalid payment structure' 
+      return res.status(404).json({
+        success: false,
+        message: 'Contract not found or invalid payment structure'
       });
     }
 
@@ -79,10 +79,10 @@ export const getTimesheetLogs = async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching timesheet logs:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Server error fetching timesheet logs',
-      error: error.message 
+      error: error.message
     });
   }
 };
@@ -91,7 +91,7 @@ export const stopWorkSession = async (req, res) => {
     console.log('====== STOP WORK SESSION START ======');
     const { contractId, sessionId } = req.params;
     console.log('Params:', { contractId, sessionId });
-    
+
     // FIXED: Access userId directly from body
     const { notes, userId } = req.body;
     console.log('Body:', { notes, userId });
@@ -105,7 +105,7 @@ export const stopWorkSession = async (req, res) => {
         console.log(`File: ${file.originalname}, Size: ${file.size}, Path: ${file.path}`);
       });
     }
-    
+
     const files = req.files || [];
 
     const contract = await Contract.findOne({
@@ -116,26 +116,26 @@ export const stopWorkSession = async (req, res) => {
 
     if (!contract) {
       console.log('Contract not found');
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Contract not found or invalid payment structure' 
+      return res.status(404).json({
+        success: false,
+        message: 'Contract not found or invalid payment structure'
       });
     }
 
     const session = contract.timesheets.id(sessionId);
     if (!session) {
       console.log('Session not found');
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Work session not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'Work session not found'
       });
     }
 
     if (session.status !== 'active') {
       console.log('Session not active');
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Session is not active' 
+      return res.status(400).json({
+        success: false,
+        message: 'Session is not active'
       });
     }
 
@@ -143,17 +143,17 @@ export const stopWorkSession = async (req, res) => {
     const screenshotUploads = [];
     if (files && files.length > 0) {
       console.log(`Processing ${files.length} screenshots`);
-      
+
       for (const file of files) {
         try {
           console.log(`Processing file: ${file.path}`);
-          
+
           // Verify file exists and is valid before attempting to upload
           if (!fs.existsSync(file.path)) {
             console.error(`File does not exist: ${file.path}`);
             continue;
           }
-          
+
           // Verify file size
           const stats = fs.statSync(file.path);
           if (stats.size > 5 * 1024 * 1024) {
@@ -169,18 +169,18 @@ export const stopWorkSession = async (req, res) => {
             fs.unlinkSync(file.path);
             continue;
           }
-          
+
           console.log('Uploading to Cloudinary...');
           // FIXED: Using the correct uploadImage function from cloudinary utils
           const result = await uploadImage(file.path, 'timesheets');
           console.log('Upload successful:', result.secure_url);
-          
+
           screenshotUploads.push({
             imagePath: result.secure_url,
             publicId: result.public_id,
             uploadedAt: new Date()
           });
-          
+
           // Clean up temp file
           try {
             fs.unlinkSync(file.path);
@@ -195,7 +195,7 @@ export const stopWorkSession = async (req, res) => {
           }
         } catch (uploadError) {
           console.error('Error uploading screenshot:', uploadError);
-          
+
           // Clean up temp file if upload failed
           try {
             if (fs.existsSync(file.path)) {
@@ -219,11 +219,11 @@ export const stopWorkSession = async (req, res) => {
     session.notes = notes;
     session.screenshots = screenshotUploads;
     session.status = 'pending';
-    
+
     // Add additional metadata
     session.updatedAt = new Date();
     // session.screenshotCount = screenshotUploads.length;
-    
+
     await contract.save();
     console.log('Session updated successfully with', screenshotUploads.length, 'screenshots');
 
@@ -238,7 +238,7 @@ export const stopWorkSession = async (req, res) => {
   } catch (error) {
     console.error('====== ERROR IN STOP WORK SESSION ======');
     console.error(error);
-    
+
     // Enhanced cleanup of any remaining temp files
     if (req.files && Array.isArray(req.files)) {
       console.log('Cleaning up temporary files after error');
@@ -253,9 +253,9 @@ export const stopWorkSession = async (req, res) => {
         }
       }
     }
-    
-    res.status(500).json({ 
-      success: false, 
+
+    res.status(500).json({
+      success: false,
       message: 'Server error stopping work session',
       error: error.message,
       receivedFiles: req.files ? req.files.length : 0
@@ -267,7 +267,7 @@ export const approveTimesheetEntry = async (req, res) => {
   try {
     const { contractId, logId } = req.params;
     const userId = req.body.userId || req.query.userId;
-    
+
     if (!userId) {
       return res.status(400).json({
         success: false,
@@ -282,24 +282,24 @@ export const approveTimesheetEntry = async (req, res) => {
     });
 
     if (!contract) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Contract not found or unauthorized' 
+      return res.status(404).json({
+        success: false,
+        message: 'Contract not found or unauthorized'
       });
     }
 
     const log = contract.timesheets.id(logId);
     if (!log) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Timesheet entry not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'Timesheet entry not found'
       });
     }
 
     if (log.status !== 'pending') {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Only pending entries can be approved' 
+      return res.status(400).json({
+        success: false,
+        message: 'Only pending entries can be approved'
       });
     }
 
@@ -316,10 +316,10 @@ export const approveTimesheetEntry = async (req, res) => {
 
   } catch (error) {
     console.error('Error approving timesheet entry:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Server error approving timesheet entry',
-      error: error.message 
+      error: error.message
     });
   }
 };
@@ -328,14 +328,14 @@ export const disputeTimesheetEntry = async (req, res) => {
   try {
     const { contractId, logId } = req.params;
     const { reason, userId } = req.body;
-    
+
     if (!userId) {
       return res.status(400).json({
         success: false,
         message: 'User ID is required'
       });
     }
-    
+
     if (!reason) {
       return res.status(400).json({
         success: false,
@@ -350,24 +350,24 @@ export const disputeTimesheetEntry = async (req, res) => {
     });
 
     if (!contract) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Contract not found or unauthorized' 
+      return res.status(404).json({
+        success: false,
+        message: 'Contract not found or unauthorized'
       });
     }
 
     const log = contract.timesheets.id(logId);
     if (!log) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Timesheet entry not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'Timesheet entry not found'
       });
     }
 
     if (log.status !== 'pending') {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Only pending entries can be disputed' 
+      return res.status(400).json({
+        success: false,
+        message: 'Only pending entries can be disputed'
       });
     }
 
@@ -385,10 +385,10 @@ export const disputeTimesheetEntry = async (req, res) => {
 
   } catch (error) {
     console.error('Error disputing timesheet entry:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Server error disputing timesheet entry',
-      error: error.message 
+      error: error.message
     });
   }
 };
@@ -491,7 +491,7 @@ export const logHoursManually = async (req, res) => {
       const totalExistingSeconds = contract.timesheets.reduce((total, session) => {
         return total + (session.duration || 0);
       }, 0);
-      
+
       const totalExistingHours = totalExistingSeconds / 3600;
       const newTotalHours = totalExistingHours + parsedHours;
 
@@ -515,13 +515,13 @@ export const logHoursManually = async (req, res) => {
     for (const file of files) {
       try {
         console.log(`Processing screenshot: ${file.originalname}`);
-        
+
         // Verify file exists and is valid
         if (!fs.existsSync(file.path)) {
           console.error(`File does not exist: ${file.path}`);
           continue;
         }
-        
+
         // Verify file size (5MB limit)
         const stats = fs.statSync(file.path);
         if (stats.size > 5 * 1024 * 1024) {
@@ -540,13 +540,13 @@ export const logHoursManually = async (req, res) => {
 
         const result = await uploadImage(file.path, 'timesheets');
         console.log('Screenshot uploaded successfully:', result.secure_url);
-        
+
         screenshotUploads.push({
           imagePath: result.secure_url,
           publicId: result.public_id,
           uploadedAt: new Date()
         });
-        
+
         // Clean up temp file
         fs.unlinkSync(file.path);
       } catch (uploadError) {
@@ -560,7 +560,7 @@ export const logHoursManually = async (req, res) => {
     // Create manual log entry - FIXED: Proper time calculation
     const now = new Date();
     const startTime = new Date(now.getTime() - (durationInSeconds * 1000));
-    
+
     const manualLog = {
       startTime: startTime,
       endTime: now,
@@ -594,7 +594,7 @@ export const logHoursManually = async (req, res) => {
 
   } catch (error) {
     console.error('Error logging hours manually:', error);
-    
+
     // Clean up any remaining temp files
     if (req.files && Array.isArray(req.files)) {
       for (const file of req.files) {
@@ -607,7 +607,7 @@ export const logHoursManually = async (req, res) => {
         }
       }
     }
-    
+
     res.status(500).json({
       success: false,
       message: 'Server error logging hours manually',

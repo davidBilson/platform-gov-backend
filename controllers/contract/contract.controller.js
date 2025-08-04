@@ -275,9 +275,9 @@ export const createContract = async (req, res) => {
     });
 
     if (!hiring) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Valid hiring record not found or IDs do not match' 
+      return res.status(404).json({
+        success: false,
+        message: 'Valid hiring record not found or IDs do not match'
       });
     }
 
@@ -337,10 +337,10 @@ export const createContract = async (req, res) => {
 
   } catch (error) {
     console.error('Error creating contract:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Server error creating contract',
-      error: error.message 
+      error: error.message
     });
   }
 };
@@ -366,24 +366,24 @@ export const getSingleContract = async (req, res) => {
       contract = await Contract.findOne({
         _id: mutualContractId
       })
-      .populate('jobId', 'jobTitle')
-      .populate('clientId', 'name email profileImage')
-      .populate('contractorId', 'name email profileImage bankAccounts isHighPriority');
+        .populate('jobId', 'jobTitle')
+        .populate('clientId', 'name email profileImage')
+        .populate('contractorId', 'name email profileImage bankAccounts isHighPriority');
     } else {
       contract = await Contract.findOne({
         jobId,
         clientId,
         contractorId
       })
-      .populate('jobId', 'jobTitle')
-      .populate('clientId', 'name email profileImage')
-      .populate('contractorId', 'name email profileImage bankAccounts isHighPriority');
+        .populate('jobId', 'jobTitle')
+        .populate('clientId', 'name email profileImage')
+        .populate('contractorId', 'name email profileImage bankAccounts isHighPriority');
     }
 
     if (!contract) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Contract not found with the provided parameters' 
+      return res.status(404).json({
+        success: false,
+        message: 'Contract not found with the provided parameters'
       });
     }
 
@@ -394,10 +394,10 @@ export const getSingleContract = async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching contract:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Server error fetching contract',
-      error: error.message 
+      error: error.message
     });
   }
 };
@@ -413,9 +413,9 @@ export const getContracts = async (req, res) => {
       });
     }
 
-    const contracts = await Contract.find({ 
+    const contracts = await Contract.find({
       $or: [{ clientId: userId }, { contractorId: userId }]
-     })
+    })
       .populate({
         path: 'hiringId',
         select: 'applicationId'
@@ -442,9 +442,9 @@ export const getContracts = async (req, res) => {
     }
 
     const clientIds = [...new Set(contracts.map(contract => contract.clientId?._id).filter(Boolean))];
-    
+
     const clientProfiles = await ClientProfile.find({ user: { $in: clientIds } });
-    
+
     const profileMap = clientProfiles.reduce((map, profile) => {
       map[profile.user.toString()] = profile;
       return map;
@@ -452,11 +452,11 @@ export const getContracts = async (req, res) => {
 
     const enrichedContracts = contracts.map(contract => {
       const contractObj = contract.toObject();
-      
+
       if (contractObj.clientId && profileMap[contractObj.clientId._id.toString()]) {
         contractObj.clientId.profile = profileMap[contractObj.clientId._id.toString()];
       }
-      
+
       return contractObj;
     });
 
@@ -473,10 +473,10 @@ export const getContracts = async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching contractor contracts:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Server error fetching contracts',
-      error: error.message 
+      error: error.message
     });
   }
 };
@@ -496,7 +496,7 @@ const calculateTotalEarnings = async (contract) => {
       const completedMilestones = contract.milestones?.filter(
         milestone => milestone.status === 'completed' || milestone.status === 'approved' || milestone.status === 'paid'
       ) || [];
-      
+
       totalEarnings = completedMilestones.reduce((sum, milestone) => {
         return sum + (milestone.amount || 0);
       }, 0);
@@ -507,7 +507,7 @@ const calculateTotalEarnings = async (contract) => {
       const approvedTimesheets = contract.timesheets?.filter(
         timesheet => timesheet.status === 'approved' || timesheet.status === 'paid'
       ) || [];
-      
+
       totalEarnings = approvedTimesheets.reduce((sum, timesheet) => {
         const hours = timesheet.duration || 0; // duration should be in hours
         const rate = timesheet.rate || job.price || 0; // use timesheet rate or job price
@@ -520,7 +520,7 @@ const calculateTotalEarnings = async (contract) => {
       const completedPayments = contract.retainer?.paymentHistory?.filter(
         payment => payment.status === 'completed'
       ) || [];
-      
+
       totalEarnings = completedPayments.reduce((sum, payment) => {
         return sum + (payment.amount || 0);
       }, 0);
@@ -557,7 +557,7 @@ export const endContract = async (req, res) => {
         message: 'Contract not found or unauthorized'
       });
     }
-    
+
     if (contract.status === 'completed') {
       return res.status(200).json({
         success: false,
@@ -574,11 +574,11 @@ export const endContract = async (req, res) => {
 
     // Validate earnings amount
     const overAllEarnings = await calculateTotalEarnings(contract);
-    
+
     if (overAllEarnings < 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Contract earnings cannot be negative" 
+      return res.status(400).json({
+        success: false,
+        message: "Contract earnings cannot be negative"
       });
     }
 

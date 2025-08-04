@@ -27,14 +27,14 @@ export const sendMessage = async (req, res) => {
     // Create or update thread with participants
     await MessageThread.findOneAndUpdate(
       { _id: threadId },
-      { 
-        $set: { 
+      {
+        $set: {
           lastMessage: new Date(),
           jobId,
           applicationId: proposalId
         },
-        $addToSet: { 
-          participants: { $each: [senderId, recipientId] } 
+        $addToSet: {
+          participants: { $each: [senderId, recipientId] }
         }
       },
       { upsert: true, new: true }
@@ -48,7 +48,7 @@ export const sendMessage = async (req, res) => {
       encryptedContent: encryptedContent,
       iv: iv
     });
-    
+
     const savedMessage = await newMessage.save();
     const populatedMessage = await Message.populate(savedMessage, [
       { path: 'sender', select: 'name profilePicture' },
@@ -57,10 +57,10 @@ export const sendMessage = async (req, res) => {
 
     // Emit to both the chat room and specific users
     const io = req.app.get('io');
-    
+
     // Emit to the chat room
     io.to(threadId).emit('receive-message', populatedMessage);
-    
+
     // Emit to sender with isCurrentUser: true
     io.to(senderId.toString()).emit('conversation-update', {
       threadId,
@@ -68,7 +68,7 @@ export const sendMessage = async (req, res) => {
       isCurrentUser: true,
       unreadCount: 0 // Sender's messages are always read
     });
-    
+
     // Emit to recipient with isCurrentUser: false
     io.to(recipientId.toString()).emit('conversation-update', {
       threadId,
@@ -92,7 +92,7 @@ export const getOrCreateThread = async (req, res) => {
 
     let thread = await MessageThread.findOneAndUpdate(
       { _id: threadId },
-      { 
+      {
         $set: { jobId, applicationId: proposalId },
         $addToSet: { participants: { $each: [clientId, contractorId] } }
       },
@@ -117,17 +117,17 @@ export const getUserConversations = async (req, res) => {
     const threads = await MessageThread.find({
       participants: userId
     })
-    .populate({
-      path: 'participants',
-      select: 'name',
-      model: 'User'
-    })
-    .populate({
-      path: 'jobId',
-      select: 'jobTitle',
-      model: 'Jobs'
-    })
-    .sort({ lastMessage: -1 });
+      .populate({
+        path: 'participants',
+        select: 'name',
+        model: 'User'
+      })
+      .populate({
+        path: 'jobId',
+        select: 'jobTitle',
+        model: 'Jobs'
+      })
+      .sort({ lastMessage: -1 });
 
     // Get conversation details for each thread
     const conversations = await Promise.all(
@@ -195,26 +195,26 @@ export const getUserConversations = async (req, res) => {
 export const markMessagesAsRead = async (req, res) => {
   try {
     const { threadId, userId } = req.params;
-    
+
     if (!threadId || !userId) {
       return res.status(400).json({ message: 'ThreadId and userId are required' });
     }
 
     // Update all unread messages where this user is the recipient
     const result = await Message.updateMany(
-      { 
+      {
         threadId: threadId,
         recipient: userId,
         isRead: false
       },
-      { 
-        $set: { isRead: true } 
+      {
+        $set: { isRead: true }
       }
     );
 
-    res.json({ 
-      success: true, 
-      messagesUpdated: result.modifiedCount 
+    res.json({
+      success: true,
+      messagesUpdated: result.modifiedCount
     });
   } catch (error) {
     console.error('Error marking messages as read:', error);

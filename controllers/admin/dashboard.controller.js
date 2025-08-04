@@ -8,7 +8,7 @@ export const getDashboardData = async (req, res) => {
     const now = new Date();
     const oneWeekAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
     const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-    
+
     const [
       userCounts,
       activeContracts,
@@ -21,86 +21,110 @@ export const getDashboardData = async (req, res) => {
     ] = await Promise.all([
       // User counts
       User.aggregate([
-        { $group: { 
-          _id: null,
-          totalUsers: { $sum: 1 },
-          freelancers: { $sum: { $cond: [{ $eq: ["$role", "contractor"] }, 1, 0] } },
-          clients: { $sum: { $cond: [{ $eq: ["$role", "client"] }, 1, 0] } }
-        }}
+        {
+          $group: {
+            _id: null,
+            totalUsers: { $sum: 1 },
+            freelancers: { $sum: { $cond: [{ $eq: ["$role", "contractor"] }, 1, 0] } },
+            clients: { $sum: { $cond: [{ $eq: ["$role", "client"] }, 1, 0] } }
+          }
+        }
       ]),
-      
+
       // Active contracts
       Contract.countDocuments({ status: 'active' }),
-      
+
       // Job metrics
       Job.aggregate([
-        { $group: { 
-          _id: null,
-          totalJobs: { $sum: 1 },
-          fundedJobs: { $sum: { $cond: ["$isFunded", 1, 0] } }
-        }}
+        {
+          $group: {
+            _id: null,
+            totalJobs: { $sum: 1 },
+            fundedJobs: { $sum: { $cond: ["$isFunded", 1, 0] } }
+          }
+        }
       ]),
-      
+
       // Project funding metrics (client-side)
       Transaction.aggregate([
-        { $match: { 
-          type: 'project_funding', 
-          status: 'completed' 
-        }},
-        { $group: {
-          _id: null,
-          totalAmount: { $sum: "$amount" },
-          totalFees: { $sum: "$fee" }
-        }}
+        {
+          $match: {
+            type: 'project_funding',
+            status: 'completed'
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalAmount: { $sum: "$amount" },
+            totalFees: { $sum: "$fee" }
+          }
+        }
       ]),
-      
+
       // Payout metrics (freelancer-side)
       Transaction.aggregate([
-        { $match: { 
-          type: 'payout', 
-          status: 'completed' 
-        }},
-        { $group: {
-          _id: null,
-          totalAmount: { $sum: "$amount" },
-          totalFees: { $sum: "$fee" }
-        }}
+        {
+          $match: {
+            type: 'payout',
+            status: 'completed'
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalAmount: { $sum: "$amount" },
+            totalFees: { $sum: "$fee" }
+          }
+        }
       ]),
-      
+
       // Weekly fees
       Transaction.aggregate([
-        { $match: { 
-          status: 'completed',
-          createdAt: { $gte: oneWeekAgo } 
-        }},
-        { $group: { 
-          _id: null, 
-          totalFees: { $sum: "$fee" } 
-        }}
+        {
+          $match: {
+            status: 'completed',
+            createdAt: { $gte: oneWeekAgo }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalFees: { $sum: "$fee" }
+          }
+        }
       ]),
-      
+
       // Monthly fees
       Transaction.aggregate([
-        { $match: { 
-          status: 'completed',
-          createdAt: { $gte: oneMonthAgo } 
-        }},
-        { $group: { 
-          _id: null, 
-          totalFees: { $sum: "$fee" } 
-        }}
+        {
+          $match: {
+            status: 'completed',
+            createdAt: { $gte: oneMonthAgo }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalFees: { $sum: "$fee" }
+          }
+        }
       ]),
-      
+
       // Pending withdrawals
       Transaction.aggregate([
-        { $match: { 
-          type: 'payout', 
-          status: 'pending' 
-        }},
-        { $group: { 
-          _id: null, 
-          totalNetAmount: { $sum: "$netAmount" } 
-        }}
+        {
+          $match: {
+            type: 'payout',
+            status: 'pending'
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalNetAmount: { $sum: "$netAmount" }
+          }
+        }
       ])
     ]);
 
@@ -109,7 +133,7 @@ export const getDashboardData = async (req, res) => {
     const { totalJobs, fundedJobs } = jobCounts[0] || { totalJobs: 0, fundedJobs: 0 };
     const { totalAmount: fundingAmount = 0, totalFees: clientFees = 0 } = fundingMetrics[0] || {};
     const { totalAmount: payoutAmount = 0, totalFees: freelancerFees = 0 } = payoutMetrics[0] || {};
-    
+
     // Calculate financial metrics
     const totalTransactions = fundingAmount + payoutAmount;
     const totalFees = clientFees + freelancerFees;

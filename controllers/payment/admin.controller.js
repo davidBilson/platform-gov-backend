@@ -9,7 +9,7 @@ export const updateFundStatus = async (req, res) => {
   try {
     const { fundId, status, reason } = req.body;
     const fund = await Fund.findById(fundId);
-    
+
     if (!fund) {
       return res.status(404).json({ success: false, message: 'Fund not found' });
     }
@@ -32,10 +32,10 @@ export const updateFundStatus = async (req, res) => {
 
     res.status(200).json({ success: true, fund });
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Status update failed',
-      error: error.message 
+      error: error.message
     });
   }
 };
@@ -45,7 +45,7 @@ export const manageEscrow = async (req, res) => {
   try {
     const { accountId, action, amount, reason } = req.body;
     const account = await EscrowAccount.findById(accountId);
-    
+
     if (!account) {
       return res.status(404).json({ success: false, message: 'Account not found' });
     }
@@ -61,25 +61,25 @@ export const manageEscrow = async (req, res) => {
         newState = { frozen: true };
         actionType = 'account_freeze';
         break;
-        
+
       case 'unfreeze':
         previousState = { frozen: account.frozen };
         account.frozen = false;
         newState = { frozen: false };
         actionType = 'account_unfreeze';
         break;
-        
+
       case 'adjust':
         previousState = { balance: account.balance };
         account.balance += amount;
         newState = { balance: account.balance };
         actionType = 'adjust_escrow_balance';
         break;
-        
+
       default:
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Invalid escrow action' 
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid escrow action'
         });
     }
 
@@ -99,17 +99,17 @@ export const manageEscrow = async (req, res) => {
 
     res.status(200).json({ success: true, account });
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Escrow management failed',
-      error: error.message 
+      error: error.message
     });
   }
 };
 
 export const approvePayment = async (req, res) => {
   const payment = await Payment.findById(req.params.paymentId);
-  
+
   // Transfer funds using Stripe
   const transfer = await stripe.transfers.create({
     amount: payment.amount * 100,
@@ -120,6 +120,6 @@ export const approvePayment = async (req, res) => {
   // Update payment status to 'completed'
   payment.status = 'completed';
   await payment.save();
-  
+
   res.json({ success: true });
 };

@@ -17,7 +17,17 @@ import { getFeeSettings, updateFeeSettings } from '../controllers/admin/fee.sett
 import { getDashboardData } from '../controllers/admin/dashboard.controller.js';
 import { fetchAllWithdrawals } from '../controllers/payment/withdrawals.controller.js';
 import { addAdmin, getAllAdmins, removeAdmin, toggleSuspendAdmin } from '../controllers/admin/admin-management.js';
-import { upsertDocument, getDocumentByType } from '../controllers/legalContent.controller.js';
+import { upsertDocument } from '../controllers/legalContent.controller.js';
+import { 
+  fetchAllSubscriptions, 
+  fetchSubscriptionSettings, 
+  generateGCCDiscountToken, 
+  getSubscriptionStatistics, 
+  setAdminFeePercentage, 
+  setEarlyAccessDuration, 
+  setSubscriptionPricing, 
+  setSubscriptionTips 
+} from '../controllers/admin/admin-subscription-settings.controller.js';
 
 const router = express.Router();
 
@@ -63,5 +73,16 @@ router.delete('/delete-user/:id', deleteUser);
 
 // router.get('/get-legal-content-by-type/:documentType', getDocumentByType);
 router.post('/upsert-legal-content', upsertDocument);
+
+// subscriptions
+
+router.put('/subscription/set-pricing', setSubscriptionPricing);
+router.post('/subscription/generate-gcc-discount-token', generateGCCDiscountToken);
+router.put('/subscription/set-fee-percentage', setAdminFeePercentage);
+router.put('/subscription/set-tips', setSubscriptionTips);
+router.put('/subscription/set-early-access-duration', setEarlyAccessDuration);
+router.get('/subscription/fetch-settings',fetchSubscriptionSettings);
+router.get('/subscription/fetch-all-subscriptions', fetchAllSubscriptions);
+router.get('/subscription/fetch-subscriptions-stats', getSubscriptionStatistics);
 
 export default router;

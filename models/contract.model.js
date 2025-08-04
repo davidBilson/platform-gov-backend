@@ -7,7 +7,7 @@ const contractSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
-  
+
   jobId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Jobs',
@@ -57,25 +57,25 @@ const contractSchema = new mongoose.Schema({
     min: 0,
     default: null
   },
-  
+
   isManual: {
     type: Boolean,
     default: false
   },
 
   endDate: Date,
-  
+
   status: {
     type: String,
     enum: ['active', 'paused', 'completed', 'cancelled', 'disputed'],
     default: 'active'
   },
-  
+
   paymentStructure: {
     type: String,
     enum: ['milestone', 'timesheet', 'retainer'],
   },
-  
+
   milestones: [{
     name: {
       type: String,
@@ -108,7 +108,7 @@ const contractSchema = new mongoose.Schema({
       default: () => new mongoose.Types.ObjectId()
     }
   }],
-  
+
   timesheets: [{
     startTime: {
       type: Date,
@@ -119,7 +119,7 @@ const contractSchema = new mongoose.Schema({
       type: Number,
       min: 0
     },
-    
+
     screenshots: [{
       imagePath: {
         type: String,
@@ -134,7 +134,7 @@ const contractSchema = new mongoose.Schema({
         default: Date.now
       }
     }],
-    
+
     // Status and approval
     status: {
       type: String,
@@ -142,7 +142,7 @@ const contractSchema = new mongoose.Schema({
       default: 'pending'
     },
     notes: String,
-    
+
     // Financial information
     rate: {
       type: Number,
@@ -157,7 +157,7 @@ const contractSchema = new mongoose.Schema({
       ref: 'User'
     },
     approvedAt: Date,
-    
+
     // Dispute tracking
     disputeReason: String,
     disputedBy: {
@@ -165,10 +165,10 @@ const contractSchema = new mongoose.Schema({
       ref: 'User'
     },
     disputedAt: Date,
-    
+
     // Payment tracking
     paymentDate: Date,
-    
+
     // Timestamps
     createdAt: {
       type: Date,
@@ -183,7 +183,7 @@ const contractSchema = new mongoose.Schema({
       default: () => new mongoose.Types.ObjectId()
     }
   }],
-  
+
   retainer: {
     recurringAmount: {
       type: Number,
@@ -217,7 +217,7 @@ const contractSchema = new mongoose.Schema({
       }
     }],
   },
-  
+
   createdAt: {
     type: Date,
     default: Date.now
@@ -230,7 +230,7 @@ const contractSchema = new mongoose.Schema({
   timestamps: true
 });
 
-contractSchema.pre('save', function(next) {
+contractSchema.pre('save', function (next) {
   this.updatedAt = Date.now();
   next();
 });

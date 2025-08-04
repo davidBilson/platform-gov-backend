@@ -5,19 +5,19 @@ import ClientProfile from '../models/profile.client.model.js';
 import mongoose from 'mongoose';
 
 import {
-    createContractorProfile,
-    updateContractorProfile,
-    getContractorProfile,
-    deleteContractorProfile,
-    getAllContractorProfiles,
+  createContractorProfile,
+  updateContractorProfile,
+  getContractorProfile,
+  deleteContractorProfile,
+  getAllContractorProfiles,
 } from '../controllers/profile.contractor.controller.js';
 
 import {
-    createClientProfile,
-    updateClientProfile,
-    getClientProfile,
-    deleteClientProfile,
-    getAllClientProfiles,
+  createClientProfile,
+  updateClientProfile,
+  getClientProfile,
+  deleteClientProfile,
+  getAllClientProfiles,
 } from '../controllers/profile.client.controller.js';
 
 import { upload } from '../middleware/multer-image-upload.js';
@@ -63,7 +63,7 @@ router.get('/get-profile-image/:id', async (req, res) => {
     if (contractorProfile) {
       return res.status(200).json({
         success: true,
-        data: contractorProfile.profileImage ||''
+        data: contractorProfile.profileImage || ''
       });
     }
 
@@ -102,10 +102,10 @@ router.post('/upload-profile-image', upload.single('profileImage'), async (req, 
         message: 'No file uploaded'
       });
     }
-    
+
     // Upload the temp file to Cloudinary
     const result = await uploadImage(req.file.path, 'profiles');
-    
+
     // Return the secure URL and public_id from Cloudinary
     res.status(200).json({
       success: true,
@@ -116,7 +116,7 @@ router.post('/upload-profile-image', upload.single('profileImage'), async (req, 
     });
   } catch (error) {
     console.error('Image upload error:', error);
-    
+
     // Clean up temp file if it exists and upload failed
     if (req.file && req.file.path) {
       try {
@@ -125,7 +125,7 @@ router.post('/upload-profile-image', upload.single('profileImage'), async (req, 
         console.error('Error removing temporary file:', err);
       }
     }
-    
+
     res.status(500).json({
       success: false,
       message: error.message || 'Error uploading file'

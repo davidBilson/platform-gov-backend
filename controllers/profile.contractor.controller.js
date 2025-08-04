@@ -26,12 +26,12 @@ export const getAllContractorProfiles = async (req, res) => {
   try {
 
     const profiles = await ContractorProfile.find();
-    
+
     const enhancedProfiles = [];
-    
+
     for (const profile of profiles) {
       const user = await User.findById(profile.user).select('name email phoneNumber isSuspended isHighPriority');
-      
+
       if (user) {
         const enhancedProfile = {
           ...profile.toObject(),
@@ -44,14 +44,14 @@ export const getAllContractorProfiles = async (req, res) => {
             isHighPriority: user.isHighPriority
           }
         };
-        
+
         enhancedProfiles.push(enhancedProfile);
       } else {
         // If user not found, just include the profile
         enhancedProfiles.push(profile.toObject());
       }
     }
-    
+
     res.status(200).json({
       success: true,
       count: enhancedProfiles.length,
@@ -67,22 +67,22 @@ export const getAllContractorProfiles = async (req, res) => {
 
 export const getContractorProfile = async (req, res) => {
   try {
-    
+
     const userId = req.params.id;
-    
+
     if (!userId || !isValidObjectId(userId)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid user ID'
       });
     }
-    
+
     let profile = await ContractorProfile.findOne({ user: userId })
       .populate({
         path: 'user',
         select: 'name isHighPriority isSuspended bankAccounts'
       });
-    
+
     if (!profile) {
       const objectId = new mongoose.Types.ObjectId(userId.toString());
       profile = await ContractorProfile.findOne({ user: objectId })
@@ -91,7 +91,7 @@ export const getContractorProfile = async (req, res) => {
           select: 'name isHighPriority isSuspended'
         });
     }
-    
+
     if (!profile) {
       return res.status(404).json({
         success: false,
@@ -103,7 +103,7 @@ export const getContractorProfile = async (req, res) => {
       ...profile.toObject(),
       name: profile.user?.name || 'Anonymous'
     };
-    
+
     res.status(200).json({
       success: true,
       data: profileWithName
@@ -127,10 +127,10 @@ export const createContractorProfile = async (req, res) => {
         message: 'Invalid user ID'
       });
     }
-    
+
     // Convert to ObjectId
     const objectId = new mongoose.Types.ObjectId(userId.toString());
-    
+
     // Check if profile already exists
     const existingProfile = await ContractorProfile.findOne({ user: objectId });
     if (existingProfile) {
@@ -139,17 +139,17 @@ export const createContractorProfile = async (req, res) => {
         message: 'Contractor profile already exists for this user.'
       });
     }
-    
+
     // Parse arrays if they come as strings
     const skills = parseArrayField(req.body.skills);
     const expertise = parseArrayField(req.body.expertise);
     const certifications = parseArrayField(req.body.certifications);
     const workHistory = parseArrayField(req.body.workHistory);
     const degrees = parseArrayField(req.body.degrees);
-    
+
     // Handle profile image
     const profileImage = req.body.profileImage || '';
-    
+
     // Create profile data
     const profileData = {
       user: objectId,
@@ -168,10 +168,10 @@ export const createContractorProfile = async (req, res) => {
       workHistory,
       degrees
     };
-    
+
     // Create new profile
     const profile = await ContractorProfile.create(profileData);
-    
+
     res.status(201).json({
       success: true,
       data: profile,
@@ -194,32 +194,32 @@ export const updateContractorProfile = async (req, res) => {
         message: 'Invalid user ID'
       });
     }
-    
+
     // Convert to ObjectId
     const objectId = new mongoose.Types.ObjectId(userId.toString());
-    
+
     // Check if profile exists
     let profile = await ContractorProfile.findOne({ user: objectId });
-    
+
     // If not found, try with string ID as fallback
     if (!profile) {
       profile = await ContractorProfile.findOne({ user: userId });
     }
-    
+
     if (!profile) {
       return res.status(404).json({
         success: false,
         message: 'Contractor profile not found'
       });
     }
-    
+
     // Parse arrays if they come as strings
     const skills = parseArrayField(req.body.skills) ?? profile.skills;
     // const expertise = parseArrayField(req.body.expertise) ?? profile.expertise;
     const certifications = parseArrayField(req.body.certifications) ?? profile.certifications;
     const workHistory = parseArrayField(req.body.workHistory) ?? profile.workHistory;
     const degrees = parseArrayField(req.body.degrees) ?? profile.degrees;
-    
+
     // Prepare update data
     const updateData = {
       bio: req.body.bio || profile.bio,
@@ -237,10 +237,10 @@ export const updateContractorProfile = async (req, res) => {
       degrees,
       updatedAt: Date.now()
     };
-    
+
     // Handle profile image replacement
-    if (req.body.profileImage && profile.profileImage && 
-        req.body.profileImage !== profile.profileImage) {
+    if (req.body.profileImage && profile.profileImage &&
+      req.body.profileImage !== profile.profileImage) {
       try {
         // Delete the old image from Cloudinary if it's a Cloudinary URL
         if (profile.profileImage.includes('cloudinary.com')) {
@@ -257,19 +257,19 @@ export const updateContractorProfile = async (req, res) => {
         // Continue with update even if delete fails
       }
     }
-    
+
     // Update profile image if provided
     if (req.body.profileImage) {
       updateData.profileImage = req.body.profileImage;
     }
-    
+
     // Update profile
     profile = await ContractorProfile.findOneAndUpdate(
-      { user: objectId }, 
+      { user: objectId },
       { $set: updateData },
       { new: true, runValidators: true }
     );
-    
+
     res.status(200).json({
       success: true,
       data: profile,
@@ -286,10 +286,10 @@ export const updateContractorProfile = async (req, res) => {
 export const deleteContractorProfile = async (req, res) => {
   try {
     const userId = req.params.id;
-    
+
     // Convert userId to ObjectId
     const userObjectId = toObjectId(userId);
-    
+
     // Validate userId
     if (!userObjectId) {
       return res.status(400).json({
@@ -297,7 +297,7 @@ export const deleteContractorProfile = async (req, res) => {
         message: 'Invalid user ID'
       });
     }
-    
+
     const profile = await ContractorProfile.findOne({ user: userObjectId });
     if (!profile) {
       return res.status(404).json({
@@ -305,7 +305,7 @@ export const deleteContractorProfile = async (req, res) => {
         message: 'Contractor profile not found'
       });
     }
-    
+
     // If profile has an image on Cloudinary, delete it
     if (profile.profileImage && profile.profileImage.includes('cloudinary.com')) {
       try {
@@ -321,9 +321,9 @@ export const deleteContractorProfile = async (req, res) => {
         // Continue with deletion even if image delete fails
       }
     }
-    
+
     await ContractorProfile.findOneAndDelete({ user: userObjectId });
-    
+
     res.status(200).json({
       success: true,
       message: 'Contractor profile deleted successfully'
@@ -340,26 +340,26 @@ export const getMyProfile = async (req, res) => {
   try {
     // Get userId from query parameter
     const userId = req.query.userId;
-    
+
     // Convert userId to ObjectId
     const userObjectId = toObjectId(userId);
-    
+
     if (!userObjectId) {
       return res.status(400).json({
         success: false,
         message: 'Invalid user ID'
       });
     }
-    
+
     const profile = await ContractorProfile.findOne({ user: userObjectId });
-    
+
     if (!profile) {
       return res.status(404).json({
         success: false,
         message: 'Contractor profile not found'
       });
     }
-    
+
     res.status(200).json({
       success: true,
       data: profile
@@ -376,22 +376,22 @@ export const getMyProfile = async (req, res) => {
 export const searchProfiles = async (req, res) => {
   try {
     const { skills, expertise, certifications, query, limit = 20, skip = 0 } = req.query;
-    
+
     const searchCriteria = {};
-    
+
     // Add search criteria based on query parameters
     if (skills) {
       searchCriteria.skills = { $in: skills.split(',') };
     }
-    
+
     if (expertise) {
       searchCriteria.expertise = { $in: expertise.split(',') };
     }
-    
+
     if (certifications) {
       searchCriteria.certifications = { $in: certifications.split(',') };
     }
-    
+
     // Text search across multiple fields
     if (query) {
       searchCriteria.$or = [
@@ -399,16 +399,16 @@ export const searchProfiles = async (req, res) => {
         { bio: { $regex: query, $options: 'i' } }
       ];
     }
-    
+
     // Find profiles matching criteria
     const profiles = await ContractorProfile.find(searchCriteria)
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
       .skip(parseInt(skip));
-    
+
     // Count total matching profiles for pagination
     const total = await ContractorProfile.countDocuments(searchCriteria);
-    
+
     res.status(200).json({
       success: true,
       count: profiles.length,
@@ -427,7 +427,7 @@ export const searchProfiles = async (req, res) => {
 export const getAllSkills = async (req, res) => {
   try {
     const skills = await ContractorProfile.distinct('skills');
-    
+
     res.status(200).json({
       success: true,
       count: skills.length,
@@ -445,7 +445,7 @@ export const getAllSkills = async (req, res) => {
 export const getAllExpertise = async (req, res) => {
   try {
     const expertise = await ContractorProfile.distinct('expertise');
-    
+
     res.status(200).json({
       success: true,
       count: expertise.length,
@@ -463,7 +463,7 @@ export const getAllExpertise = async (req, res) => {
 export const getAllCertifications = async (req, res) => {
   try {
     const certifications = await Profile.distinct('certifications');
-    
+
     res.status(200).json({
       success: true,
       count: certifications.length,

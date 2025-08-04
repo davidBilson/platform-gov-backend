@@ -65,7 +65,7 @@ const DegreeSchema = new Schema({
 
 // Profile schema
 const contractorProfileSchema = new Schema({
- 
+
   user: {
     type: Schema.Types.ObjectId,
     ref: 'User',
@@ -141,7 +141,7 @@ contractorProfileSchema.index({ certifications: 1 });
 
 
 // Document middleware: runs before .save() and .create()
-contractorProfileSchema.pre('save', function(next) {
+contractorProfileSchema.pre('save', function (next) {
   // Convert rate per hour to number if it's a string
   if (typeof this.ratePerHour === 'string') {
     this.ratePerHour = parseFloat(this.ratePerHour) || 0;

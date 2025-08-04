@@ -15,21 +15,21 @@ export const signUp = async (req, res, next) => {
 
     // Check if user with the email already exists
     const existingUser = await User.findOne({ email });
-    
+
     if (existingUser) {
       return res.status(409).json({ message: 'Email already in use' });
     }
-    
+
     // Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
-    
+
     // Generate verification codes (6 digits)
     const generateSixDigitCode = () => Math.floor(100000 + Math.random() * 900000).toString();
-    
+
     const emailVerificationCode = generateSixDigitCode();
     const phoneVerificationCode = generateSixDigitCode();
-    
+
     // Create new user
     const newUser = await User.create({
       name: `${firstName} ${lastName}`,
@@ -40,16 +40,16 @@ export const signUp = async (req, res, next) => {
       phoneVerificationCode,
       role: role || 'contractor'
     });
-    
+
     // Prepare user data for response
     const userData = newUser.toObject();
     delete userData.password;
     delete userData.emailVerificationCode;
     delete userData.phoneVerificationCode;
-    
+
     try {
       await emailService.sendVerificationCode(newUser.email, emailVerificationCode);
-      
+
       return res.status(201).json({
         status: 'success',
         message: 'User registered successfully. Please verify your email.',
@@ -63,7 +63,7 @@ export const signUp = async (req, res, next) => {
       });
     } catch (emailError) {
       console.error('Error sending email:', emailError);
-      return res.status(201).json({ 
+      return res.status(201).json({
         status: 'partial_success',
         message: 'Account created but verification email could not be sent. Please request a new code.',
         data: {
@@ -82,22 +82,22 @@ export const signUp = async (req, res, next) => {
 export const verifyEmail = async (req, res, next) => {
   try {
     const { userId, code } = req.body;
-    
+
     const user = await User.findById(userId);
-    
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    
+
     if (user.emailVerificationCode !== code) {
       return res.status(400).json({ message: 'Invalid verification code' });
     }
-    
+
     // Mark email as verified and clear verification code
     user.isEmailVerified = true;
     user.emailVerificationCode = undefined;
     await user.save();
-    
+
     res.status(200).json({
       status: 'success',
       message: 'Email verified successfully',
@@ -115,34 +115,34 @@ export const verifyEmail = async (req, res, next) => {
 export const sendPhoneVerificationCode = async (req, res, next) => {
   try {
     const { userId } = req.body;
-    
+
     const user = await User.findById(userId);
-    
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    
+
     if (!user.isEmailVerified) {
       return res.status(400).json({ message: 'Email must be verified first' });
     }
-    
+
     // Generate a new phone verification code if needed
     if (!user.phoneVerificationCode) {
       user.phoneVerificationCode = Math.floor(100000 + Math.random() * 900000).toString();
       await user.save();
     }
-    
+
     // Send verification code via Twilio
     try {
       await twilio.sendSMS(
-        user.phoneNumber, 
+        user.phoneNumber,
         `Your verification code is: ${user.phoneVerificationCode}`
       );
     } catch (smsError) {
       console.error('Error sending SMS:', smsError);
       return res.status(500).json({ message: 'Failed to send verification code. Please try again.' });
     }
-    
+
     res.status(200).json({
       status: 'success',
       message: 'Verification code sent to your phone number'
@@ -158,26 +158,26 @@ export const sendPhoneVerificationCode = async (req, res, next) => {
 export const verifyPhone = async (req, res, next) => {
   try {
     const { userId, code } = req.body;
-    
+
     const user = await User.findById(userId);
-    
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    
+
     if (!user.isEmailVerified) {
       return res.status(400).json({ message: 'Email must be verified first' });
     }
-    
+
     if (user.phoneVerificationCode !== code) {
       return res.status(400).json({ message: 'Invalid verification code' });
     }
-    
+
     // Mark phone as verified and clear verification code
     user.isPhoneVerified = true;
     user.phoneVerificationCode = undefined;
     await user.save();
-    
+
     res.status(200).json({
       status: 'success',
       message: 'Phone number verified successfully',
@@ -198,22 +198,22 @@ export const verifyPhone = async (req, res, next) => {
 export const resendEmailVerification = async (req, res, next) => {
   try {
     const { userId } = req.body;
-    
+
     const user = await User.findById(userId);
-    
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    
+
     if (user.isEmailVerified) {
       return res.status(400).json({ message: 'Email already verified' });
     }
-    
+
     // Generate a new verification code
     const newCode = Math.floor(100000 + Math.random() * 900000).toString();
     user.emailVerificationCode = newCode;
     await user.save();
-    
+
     // Send email with the new code
     // Placeholder for email sending logic
     try {
@@ -223,7 +223,7 @@ export const resendEmailVerification = async (req, res, next) => {
       console.error('Error sending email:', emailError);
       return res.status(500).json({ message: 'Failed to send verification code. Please try again.' });
     }
-    
+
     res.status(200).json({
       status: 'success',
       message: 'Verification code resent to your email'
@@ -239,37 +239,37 @@ export const resendEmailVerification = async (req, res, next) => {
 export const resendPhoneVerification = async (req, res, next) => {
   try {
     const { userId } = req.body;
-    
+
     const user = await User.findById(userId);
-    
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    
+
     if (!user.isEmailVerified) {
       return res.status(400).json({ message: 'Email must be verified first' });
     }
-    
+
     if (user.isPhoneVerified) {
       return res.status(400).json({ message: 'Phone already verified' });
     }
-    
+
     // Generate a new verification code
     const newCode = Math.floor(100000 + Math.random() * 900000).toString();
     user.phoneVerificationCode = newCode;
     await user.save();
-    
+
     // Send SMS with the new code
     try {
       await twilio.sendSMS(
-        user.phoneNumber, 
+        user.phoneNumber,
         `Your verification code is: ${newCode}`
       );
     } catch (smsError) {
       console.error('Error sending SMS:', smsError);
       return res.status(500).json({ message: 'Failed to send verification code. Please try again.' });
     }
-    
+
     res.status(200).json({
       status: 'success',
       message: 'Verification code resent to your phone number'
@@ -284,34 +284,34 @@ export const resendPhoneVerification = async (req, res, next) => {
 export const signIn = async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    
+
     if (!email || !password) {
       return res.status(400).json({
         status: 'error',
         message: 'Email and password are required'
       });
     }
-    
+
     // Find user by email and explicitly select password field
     const user = await User.findOne({ email }).select('+password');
-    
+
     if (!user) {
       return res.status(401).json({
         status: 'error',
         message: 'Invalid email or password'
       });
     }
-    
+
     // Compare passwords
     const isPasswordValid = await bcrypt.compare(password, user.password);
-    
+
     if (!isPasswordValid) {
       return res.status(401).json({
         status: 'error',
         message: 'Invalid email or password'
       });
     }
-    
+
     // Create a user object without sensitive information
     const userData = user.toObject();
     delete userData.password;
@@ -319,7 +319,7 @@ export const signIn = async (req, res, next) => {
     delete userData.phoneVerificationCode;
     delete userData.resetToken;
     delete userData.resetTokenExpiry;
-    
+
     res.status(200).json({
       status: 'success',
       message: 'User logged in successfully',
@@ -339,11 +339,11 @@ export const signIn = async (req, res, next) => {
 export const requestPasswordReset = async (req, res, next) => {
   try {
     const { email } = req.body;
-    
+
     console.log('Requesting password reset for email:', email);
 
     const user = await User.findOne({ email });
-    
+
     if (!user) {
       // Don't reveal if user exists or not for security
       return res.status(200).json({
@@ -351,19 +351,19 @@ export const requestPasswordReset = async (req, res, next) => {
         message: 'If your email is registered, you will receive a password reset link'
       });
     }
-    
+
     // Generate reset token - using a 6-digit code for easier user entry
     const resetToken = Math.floor(100000 + Math.random() * 900000).toString();
     const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
-    
+
     user.resetToken = resetToken;
     user.resetTokenExpiry = resetTokenExpiry;
     await user.save();
-    
+
     // Send email with reset token
     try {
       await emailService.sendVerificationCode(user.email, resetToken);
-      
+
       return res.status(200).json({
         success: true,
         status: 'success',
@@ -387,30 +387,30 @@ export const requestPasswordReset = async (req, res, next) => {
 export const resetPassword = async (req, res, next) => {
   try {
     const { resetToken, email, newPassword } = req.body;
-    
+
     const user = await User.findOne({
       email,
       resetToken,
       resetTokenExpiry: { $gt: Date.now() }
     });
-    
+
     if (!user) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
         status: 'error',
-        message: 'Invalid or expired reset token' 
+        message: 'Invalid or expired reset token'
       });
     }
-    
+
     // Hash the new password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
-    
+
     user.password = hashedPassword;
     user.resetToken = undefined;
     user.resetTokenExpiry = undefined;
     await user.save();
-    
+
     res.status(200).json({
       success: true,
       status: 'success',
@@ -426,28 +426,28 @@ export const resetPassword = async (req, res, next) => {
 export const verifyResetToken = async (req, res, next) => {
   try {
     const { email, resetToken } = req.body;
-    
+
     if (!email || !resetToken) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'Email and reset token are required' 
+        message: 'Email and reset token are required'
       });
     }
-    
-    
+
+
     const user = await User.findOne({
       email,
       resetToken,
       resetTokenExpiry: { $gt: Date.now() }
     });
-    
+
     if (!user) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'Invalid or expired reset token' 
+        message: 'Invalid or expired reset token'
       });
     }
-    
+
     res.status(200).json({
       success: true,
       message: 'Token verified successfully'
@@ -461,13 +461,13 @@ export const verifyResetToken = async (req, res, next) => {
 export const getUserSuspendedStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
-    
+
     const user = await User.findById(id);
-    
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    
+
     res.status(200).json({
       status: 'success',
       message: 'User suspended status retrieved successfully',
@@ -475,7 +475,7 @@ export const getUserSuspendedStatus = async (req, res, next) => {
         isSuspended: user.isSuspended
       }
     });
-    
+
   } catch (error) {
     console.error('Get user suspended status error:', error);
     next(error);

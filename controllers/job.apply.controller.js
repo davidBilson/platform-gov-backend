@@ -13,28 +13,28 @@ const authMiddleware = async (req, res, next) => {
   try {
     // Get token from header
     const token = req.header('Authorization')?.replace('Bearer ', '');
-    
+
     if (!token) {
       return res.status(401).json({ success: false, message: 'No authentication token provided' });
     }
-    
+
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
+
     // Find user by id
     const User = mongoose.model('User');
     const user = await User.findById(decoded.id);
-    
+
     if (!user) {
       return res.status(401).json({ success: false, message: 'User not found' });
     }
-    
+
     // Set user in request
     req.user = {
       id: user._id,
       role: user.role
     };
-    
+
     next();
   } catch (error) {
     return res.status(401).json({ success: false, message: 'Invalid authentication token' });
@@ -45,12 +45,12 @@ const authMiddleware = async (req, res, next) => {
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = path.join(process.cwd(), 'uploads', 'job-applications');
-    
+
     // Create directory if it doesn't exist
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
-    
+
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
@@ -74,7 +74,7 @@ const fileFilter = (req, file, cb) => {
     'image/jpeg',
     'image/png'
   ];
-  
+
   if (allowedFileTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
@@ -94,7 +94,7 @@ const upload = multer({
 // Process uploaded files
 const processUploadedFile = (file) => {
   if (!file) return null;
-  
+
   return {
     filename: file.filename,
     originalName: file.originalname,
@@ -117,10 +117,10 @@ const toObjectId = (id) => {
 export const createJobApplication = async (req, res) => {
   try {
     const { jobId, userId, coverLetter, proposedRate, acknowledgment } = req.body;
-    
+
     // Convert acknowledgment string to boolean if needed
     const certificationAcknowledgment = acknowledgment === 'true' || acknowledgment === true;
-    
+
     // Validate job exists
     const job = await Job.findById(jobId);
     if (!job) {
@@ -133,25 +133,25 @@ export const createJobApplication = async (req, res) => {
     }
 
     // Check if user already has a submitted application (not a draft) for this job
-    const existingSubmittedApplication = await JobApplication.findOne({ 
-      jobId, 
+    const existingSubmittedApplication = await JobApplication.findOne({
+      jobId,
       freelancerId: userId,
       status: { $ne: 'draft' }
     });
 
     if (existingSubmittedApplication) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'You have already submitted an application to this job' 
+      return res.status(400).json({
+        success: false,
+        message: 'You have already submitted an application to this job'
       });
     }
 
     // Get freelancer profile ID
     const contractorProfile = await mongoose.model('ContractorProfile').findOne({ user: userId });
     if (!contractorProfile) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'You must complete your freelancer profile before applying to jobs' 
+      return res.status(400).json({
+        success: false,
+        message: 'You must complete your freelancer profile before applying to jobs'
       });
     }
 
@@ -176,17 +176,17 @@ export const createJobApplication = async (req, res) => {
       existingDraft.coverLetter = coverLetter;
       existingDraft.proposedRate = Number(proposedRate);
       existingDraft.certificationAcknowledgment = certificationAcknowledgment;
-      
+
       // Add new attachment if exists
       if (attachments.length > 0) {
         existingDraft.attachments.push(...attachments);
       }
-      
+
       // Change status from draft to pending
       existingDraft.status = 'pending';
-      
+
       await existingDraft.save();
-      
+
       return res.status(200).json({
         success: true,
         message: 'Application submitted successfully from draft',
@@ -204,9 +204,9 @@ export const createJobApplication = async (req, res) => {
         attachments,
         status: 'pending'
       });
-      
+
       await application.save();
-      
+
       return res.status(201).json({
         success: true,
         message: 'Application submitted successfully',
@@ -227,10 +227,10 @@ export const createJobApplication = async (req, res) => {
 export const saveJobApplicationDraft = async (req, res) => {
   try {
     const { jobId, userId, coverLetter, proposedRate, acknowledgment } = req.body;
-    
+
     // Convert acknowledgment string to boolean if needed
     const certificationAcknowledgment = acknowledgment === 'true' || acknowledgment === true;
-    
+
     // Validate job exists
     const job = await Job.findById(jobId);
     if (!job) {
@@ -238,22 +238,22 @@ export const saveJobApplicationDraft = async (req, res) => {
     }
 
     // Check if user already has a submitted application for this job
-    const existingSubmittedApplication = await JobApplication.findOne({ 
-      jobId, 
+    const existingSubmittedApplication = await JobApplication.findOne({
+      jobId,
       freelancerId: userId,
       status: { $ne: 'draft' }
     });
 
     if (existingSubmittedApplication) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'You have already submitted an application to this job' 
+      return res.status(400).json({
+        success: false,
+        message: 'You have already submitted an application to this job'
       });
     }
 
     // Check if draft already exists
-    let draft = await JobApplication.findOne({ 
-      jobId, 
+    let draft = await JobApplication.findOne({
+      jobId,
       freelancerId: userId,
       status: 'draft'
     });
@@ -272,14 +272,14 @@ export const saveJobApplicationDraft = async (req, res) => {
       draft.coverLetter = coverLetter || draft.coverLetter;
       draft.proposedRate = proposedRate ? Number(proposedRate) : draft.proposedRate;
       draft.certificationAcknowledgment = certificationAcknowledgment || draft.certificationAcknowledgment;
-      
+
       // Add new attachment if exists
       if (attachments.length > 0) {
         draft.attachments.push(...attachments);
       }
-      
+
       await draft.save();
-      
+
       return res.status(200).json({
         success: true,
         message: 'Draft updated successfully',
@@ -287,7 +287,7 @@ export const saveJobApplicationDraft = async (req, res) => {
       });
     } else {
       const contractorProfile = await mongoose.model('ContractorProfile').findOne({ user: userId });
-      
+
       // Create new draft
       draft = new JobApplication({
         jobId,
@@ -299,9 +299,9 @@ export const saveJobApplicationDraft = async (req, res) => {
         attachments,
         status: 'draft'
       });
-      
+
       await draft.save();
-      
+
       return res.status(201).json({
         success: true,
         message: 'Draft saved successfully',
@@ -322,22 +322,22 @@ export const deleteJobApplicationDraft = async (req, res) => {
   try {
     const jobId = req.params.id;
     const { userId } = req.body;
-    
+
     const draft = await JobApplication.findOne({
       jobId,
       freelancerId: userId,
       status: 'draft'
     });
-    
+
     if (!draft) {
       return res.status(404).json({
         success: false,
         message: 'Draft application not found'
       });
     }
-    
+
     await draft.deleteOne();
-    
+
     return res.status(200).json({
       success: true,
       message: 'Draft application deleted successfully'
@@ -358,38 +358,38 @@ export const updateJobApplicationAttachments = async (req, res) => {
   try {
     const { id } = req.params;
     const { userId, action, filename } = req.body;
-    
+
     const application = await JobApplication.findById(id);
-    
+
     if (!application) {
       return res.status(404).json({
         success: false,
         message: 'Application not found'
       });
     }
-    
+
     if (application.freelancerId.toString() !== userId) {
       return res.status(403).json({
         success: false,
         message: 'You are not authorized to update this application'
       });
     }
-    
+
     if (action === 'remove' && filename) {
       // Remove file from attachments
       application.attachments = application.attachments.filter(
         attachment => attachment.filename !== filename
       );
-      
+
       await application.save();
-      
+
       return res.status(200).json({
         success: true,
         message: 'Attachment removed successfully',
         data: application
       });
     }
-    
+
     return res.status(400).json({
       success: false,
       message: 'Invalid action specified'
@@ -409,9 +409,9 @@ export const getApplicationById = async (req, res) => {
     const applicationId = req.params.id;
 
     if (!mongoose.Types.ObjectId.isValid(applicationId)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid Application/Proposal ID format' 
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid Application/Proposal ID format'
       });
     }
 
@@ -431,9 +431,9 @@ export const getApplicationById = async (req, res) => {
       .populate('messageThreadId');
 
     if (!application) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Application/Proposal not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'Application/Proposal not found'
       });
     }
 
@@ -462,36 +462,36 @@ export const getApplicationById = async (req, res) => {
 export const getApplicationsByJobId = async (req, res) => {
   try {
     const jobId = req.params.id;
-    
+
     if (!mongoose.Types.ObjectId.isValid(jobId)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid job ID format' 
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid job ID format'
       });
     }
-    
+
     const job = await Job.findById(jobId);
     if (!job) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Job not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'Job not found'
       });
     }
-    
-    const applications = await JobApplication.find({ 
-      jobId, 
-      status: { $ne: 'draft' } 
+
+    const applications = await JobApplication.find({
+      jobId,
+      status: { $ne: 'draft' }
     })
-    .populate({
-      path: 'freelancerProfileId',
-      select: 'user profileImage ratePerHour primaryPosition skills expertise certifications rating location',
-      populate: {
-        path: 'user',
-        select: 'name'
-      }
-    })
-    .sort({ createdAt: -1 });
-    
+      .populate({
+        path: 'freelancerProfileId',
+        select: 'user profileImage ratePerHour primaryPosition skills expertise certifications rating location',
+        populate: {
+          path: 'user',
+          select: 'name'
+        }
+      })
+      .sort({ createdAt: -1 });
+
     // Transform the data to include the name directly
     const transformedApplications = applications.map(app => {
       const profile = app.freelancerProfileId;
@@ -503,7 +503,7 @@ export const getApplicationsByJobId = async (req, res) => {
         }
       };
     });
-    
+
     return res.status(200).json({
       success: true,
       count: transformedApplications.length,
@@ -522,20 +522,20 @@ export const getApplicationsByJobId = async (req, res) => {
 export const getApplicationsByFreelancerId = async (req, res) => {
   try {
     const userId = req.params.id;
-    
+
     if (!userId || !isValidObjectId(userId)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid user ID'
       });
     }
-    
-    const applications = await JobApplication.find({ 
-      freelancerId: userId 
+
+    const applications = await JobApplication.find({
+      freelancerId: userId
     })
-    .populate('jobId', 'jobTitle description userId clientName clientLogo jobCategory employmentType paymentType retainerAmount retainerFrequency retainerDuration location price status createdAt')
-    .sort({ createdAt: -1 });
-    
+      .populate('jobId', 'jobTitle description userId clientName clientLogo jobCategory employmentType paymentType retainerAmount retainerFrequency retainerDuration location price status createdAt')
+      .sort({ createdAt: -1 });
+
     return res.status(200).json({
       success: true,
       count: applications.length,
