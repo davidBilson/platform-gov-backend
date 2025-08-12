@@ -152,9 +152,6 @@ export const sendPhoneVerificationCode = async (req, res, next) => {
   }
 };
 
-/**
- * Verify phone controller
- */
 export const verifyPhone = async (req, res, next) => {
   try {
     const { userId, code } = req.body;
@@ -192,9 +189,6 @@ export const verifyPhone = async (req, res, next) => {
   }
 };
 
-/**
- * Resend email verification code
- */
 export const resendEmailVerification = async (req, res, next) => {
   try {
     const { userId } = req.body;
@@ -233,9 +227,6 @@ export const resendEmailVerification = async (req, res, next) => {
   }
 };
 
-/**
- * Resend phone verification code
- */
 export const resendPhoneVerification = async (req, res, next) => {
   try {
     const { userId } = req.body;
@@ -279,8 +270,6 @@ export const resendPhoneVerification = async (req, res, next) => {
   }
 };
 
-// ************* SIGN IN USER *************
-
 export const signIn = async (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -292,7 +281,6 @@ export const signIn = async (req, res, next) => {
       });
     }
 
-    // Find user by email and explicitly select password field
     const user = await User.findOne({ email }).select('+password');
 
     if (!user) {
@@ -327,15 +315,14 @@ export const signIn = async (req, res, next) => {
         user: userData
       }
     });
+
   } catch (error) {
     console.error('Sign-in error:', error);
     next(error);
   }
 };
 
-
 // ************* REQUEST PASSWORD RESET *************
-
 export const requestPasswordReset = async (req, res, next) => {
   try {
     const { email } = req.body;

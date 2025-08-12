@@ -30,7 +30,7 @@ export const getAllContractorProfiles = async (req, res) => {
     const enhancedProfiles = [];
 
     for (const profile of profiles) {
-      const user = await User.findById(profile.user).select('name email phoneNumber isSuspended isHighPriority');
+      const user = await User.findById(profile.user).select('name email phoneNumber isSuspended isSubscribed isHighPriority');
 
       if (user) {
         const enhancedProfile = {
@@ -41,7 +41,8 @@ export const getAllContractorProfiles = async (req, res) => {
             email: user.email,
             phoneNumber: user.phoneNumber,
             isSuspended: user.isSuspended,
-            isHighPriority: user.isHighPriority
+            isHighPriority: user.isHighPriority,
+            isSubscribed: user.isSubscribed ?? false
           }
         };
 

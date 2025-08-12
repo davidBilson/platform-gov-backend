@@ -1,6 +1,7 @@
 import Subscription from '../../models/subscriptions.model.js';
 import AdminSubscriptionSettings from '../../models/admin.subscription.settings.model.js';
 import { v4 as uuidv4 } from 'uuid';
+import DiscountToken from '../../models/discount.tokens.model.js';
 
 
 export const setSubscriptionPricing = async (req, res) => {
@@ -81,11 +82,12 @@ export const generateGCCDiscountToken = async (req, res) => {
     let settings = await AdminSubscriptionSettings.findOne();
     
     if (!settings) {
+
       // Create default settings if none exist
       settings = new AdminSubscriptionSettings({
         subscriptionPricing: {
-          consultant: { monthly: 29.99, annual: 299.99 },
-          client: { monthly: 19.99, annual: 199.99 }
+          consultant: { monthly: 0, annual: 0 },
+          client: { monthly: 0, annual: 0 }
         },
         gccDiscount: {
           token: newToken,
@@ -95,13 +97,19 @@ export const generateGCCDiscountToken = async (req, res) => {
         tips: 'Default subscription tips',
         earlyAccessDurationHours: 24
       });
+
     } else {
       settings.gccDiscount = {
         token: newToken,
         percentOff
       };
     }
-
+    const discountToken = new DiscountToken({
+      token: newToken,
+      discountPercentage: percentOff
+    })
+    
+    await discountToken.save();
     await settings.save();
     
     res.status(200).json({
