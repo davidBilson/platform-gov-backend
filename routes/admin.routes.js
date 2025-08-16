@@ -20,6 +20,8 @@ import { addAdmin, getAllAdmins, removeAdmin, toggleSuspendAdmin } from '../cont
 import { upsertDocument } from '../controllers/legalContent.controller.js';
 import { 
   fetchAllSubscriptions, 
+  fetchDiscountCodes, 
+  toggleDiscountCode,
   fetchSubscriptionSettings, 
   generateGCCDiscountToken, 
   getSubscriptionStatistics, 
@@ -84,5 +86,7 @@ router.put('/subscription/set-early-access-duration', setEarlyAccessDuration);
 router.get('/subscription/fetch-settings',fetchSubscriptionSettings);
 router.get('/subscription/fetch-all-subscriptions', fetchAllSubscriptions);
 router.get('/subscription/fetch-subscriptions-stats', getSubscriptionStatistics);
+router.get('/subscription/get-discount-codes', fetchDiscountCodes)
+router.put('/subscription/toggle-discount-codes', toggleDiscountCode);
 
 export default router;

@@ -5,6 +5,7 @@ import Subscription from '../models/subscriptions.model.js';
 import Transactions from '../models/transactions.model.js';
 import User from '../models/user.model.js';
 import AdminSubscriptionSettings from '../models/admin.subscription.settings.model.js';
+import DiscountToken from '../models/discount.tokens.model.js';
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 
@@ -595,14 +596,14 @@ export const fetchSubscriptionPrices = async (req, res) => {
   try {
     // Fix: Use proper Mongoose query method
     const subscription = await AdminSubscriptionSettings.findOne();
-    
+
     if (!subscription) {
       return res.status(404).json({
         success: false,
         message: 'Subscription pricing not found'
       });
     }
-    
+
     // Extract just the pricing data instead of returning the entire document
     const prices = {
       consultant: subscription.subscriptionPricing.consultant,
@@ -610,7 +611,7 @@ export const fetchSubscriptionPrices = async (req, res) => {
       // gccDiscount: subscription.gccDiscount,
       adminFeePercent: subscription.adminFeePercent
     };
-    
+
     res.status(200).json({
       success: true,
       message: 'Subscription prices fetched successfully',
@@ -626,3 +627,30 @@ export const fetchSubscriptionPrices = async (req, res) => {
     });
   }
 }
+
+export const fetchTips = async (req, res) => {
+  try {
+    const subscription = await AdminSubscriptionSettings.findOne({}, { tips: 1, _id: 0 });
+
+    if (!subscription) {
+      return res.status(404).json({
+        success: false,
+        message: 'Tips not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Tips fetched successfully',
+      tips: subscription.tips
+    });
+  } catch (error) {
+    console.error('Error fetching tips:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+}
+

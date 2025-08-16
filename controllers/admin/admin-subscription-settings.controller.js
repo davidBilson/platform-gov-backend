@@ -503,3 +503,62 @@ export const getSubscriptionStatistics = async (req, res) => {
     });
   }
 };
+
+export const fetchDiscountCodes = async (req, res) => {
+  try {
+    const discountCodes = await DiscountToken.find();
+
+    if (!discountCodes || discountCodes.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No active discount codes found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Discount codes fetched successfully',
+      discountCodes
+    });
+  } catch (error) {
+    console.error('Error fetching discount codes:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+}
+
+
+export const toggleDiscountCode = async (req, res) => {
+  try {
+    const discountCodeId = req.params.discountCodeId;
+
+    const discountCode = await DiscountToken.findById(discountCodeId);
+    if (!discountCode) {
+      return res.status(404).json({
+        success: false,
+        message: 'Discount code not found'
+      });
+    }
+
+    // Flip the current isActive state
+    discountCode.isActive = !discountCode.isActive;
+    await discountCode.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Discount code ${discountCode.isActive ? 'activated' : 'deactivated'} successfully`,
+      discountCode
+    });
+
+  } catch (error) {
+    console.error('Error toggling discount code:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to toggle discount code',
+      error: error.message
+    });
+  }
+};
