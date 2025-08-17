@@ -18,7 +18,7 @@ export const stripe = new Stripe(STRIPE_SECRET_KEY);
 
 export const subscribe = async (req, res) => {
   try {
-    const { planName, userType, billingInterval, subscriptionAmount, currency = 'USD', autoRenew } = req.body;
+    const { planName, userType, billingInterval, subscriptionAmount, currency = 'USD', autoRenew, discountToken } = req.body;
     const { userId } = req.query;
 
     // Validate required inputs
@@ -65,14 +65,62 @@ export const subscribe = async (req, res) => {
       });
     }
 
-    if (!user.stripeCustomerId || !user.defaultPaymentMethod) {
-      console.log(`User ${userId} does not have a Stripe customer ID or default payment method`);
-      return res.status(400).json({
+    // Fetch admin subscription settings to get the fee percentage
+    const adminSettings = await AdminSubscriptionSettings.findOne().sort({ createdAt: -1 });
+    if (!adminSettings) {
+      return res.status(500).json({
         success: false,
-        message: 'Payment method not set up',
-        reason: 'payment_method_not_set_up'
+        message: 'Admin subscription settings not found'
       });
     }
+
+    const adminFeePercent = adminSettings.adminFeePercent;
+
+    // Process discount token if provided
+    let discountPercentage = 0;
+    let validDiscountToken = null;
+    let discountedAmount = subscriptionAmount;
+
+    if (discountToken) {
+      const discountTokenDoc = await DiscountToken.findOne({
+        token: discountToken,
+        isActive: true
+      });
+
+      if (!discountTokenDoc) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid or expired discount token'
+        });
+      }
+
+      // Check if token has expired (though it should auto-delete after 30 days)
+      const now = new Date();
+      const tokenCreatedAt = new Date(discountTokenDoc.createdAt);
+      const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+
+      if (tokenCreatedAt < thirtyDaysAgo) {
+        return res.status(400).json({
+          success: false,
+          message: 'Discount token has expired'
+        });
+      }
+
+      validDiscountToken = discountTokenDoc;
+      discountPercentage = discountTokenDoc.discountPercentage;
+      
+      // Calculate discounted amount (before applying admin fee)
+      const discountAmount = (subscriptionAmount * discountPercentage) / 100;
+      discountedAmount = subscriptionAmount - discountAmount;
+
+      // Ensure discounted amount is not negative
+      discountedAmount = Math.max(0, discountedAmount);
+    }
+
+    // Apply admin fee to the discounted amount
+    const adminFeeAmount = (discountedAmount * adminFeePercent) / 100;
+    const finalAmount = discountedAmount + adminFeeAmount;
+rs
 
     // Check for existing active subscription
     const existingSubscription = await Subscription.findOne({
@@ -88,12 +136,13 @@ export const subscribe = async (req, res) => {
       });
     }
 
-    // Check Stripe payment setup
-    if (!user.stripeCustomerId || !user.defaultPaymentMethod) {
+    // Check Stripe payment setup only if payment is required (finalAmount > 0)
+    if (finalAmount > 0 && (!user.stripeCustomerId || !user.defaultPaymentMethod)) {
       console.log(`User ${userId} does not have a Stripe customer ID or default payment method`);
       return res.status(400).json({
         success: false,
-        message: 'Payment method not set up'
+        message: 'Payment method not set up',
+        reason: 'payment_method_not_set_up'
       });
     }
 
@@ -109,84 +158,154 @@ export const subscribe = async (req, res) => {
     // Generate subscription token
     const subscriptionToken = uuidv4();
 
-    const description = `${planName} subscription (${billingInterval}) for ${userType}`;
+    const description = `${planName} subscription (${billingInterval}) for ${userType}${validDiscountToken ? ` with ${discountPercentage}% discount` : ''} (includes ${adminFeePercent}% admin fee)`;
 
-    // Create PaymentIntent with idempotency key
-    const idempotencyKey = `sub-${userId}-${Date.now()}`;
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(subscriptionAmount * 100),
-      currency: currency.toLowerCase(),
-      customer: user.stripeCustomerId,
-      payment_method: user.defaultPaymentMethod,
-      off_session: true,
-      confirm: true,
-      description,
-      metadata: {
-        userId: user._id.toString(),
-        planName,
-        userType,
-        billingInterval
+    let paymentIntent = null;
+    let transactionStatus = 'completed';
+
+    // Only create PaymentIntent if payment is required
+    if (finalAmount > 0) {
+      // Create PaymentIntent with idempotency key
+      const idempotencyKey = `sub-${userId}-${Date.now()}`;
+      paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(finalAmount * 100), // Use final amount with admin fee
+        currency: currency.toLowerCase(),
+        customer: user.stripeCustomerId,
+        payment_method: user.defaultPaymentMethod,
+        off_session: true,
+        confirm: true,
+        description,
+        metadata: {
+          userId: user._id.toString(),
+          planName,
+          userType,
+          billingInterval,
+          originalAmount: subscriptionAmount.toString(),
+          discountPercentage: discountPercentage.toString(),
+          discountedAmount: discountedAmount.toString(),
+          adminFeePercent: adminFeePercent.toString(),
+          adminFeeAmount: adminFeeAmount.toString(),
+          finalAmount: finalAmount.toString(),
+          discountToken: discountToken || ''
+        }
+      }, {
+        idempotencyKey
+      });
+
+      // Handle authentication requirements
+      if (paymentIntent.status === 'requires_action') {
+        console.log(`Payment requires authentication for user ${userId}`);
+        return res.status(200).json({
+          success: false,
+          requires_action: true,
+          client_secret: paymentIntent.client_secret,
+          message: 'Payment requires authentication'
+        });
       }
-    }, {
-      idempotencyKey
-    });
 
-    // Handle authentication requirements
-    if (paymentIntent.status === 'requires_action') {
-      console.log(`Payment requires authentication for user ${userId}`);
-      return res.status(200).json({
-        success: false,
-        requires_action: true,
-        client_secret: paymentIntent.client_secret,
-        message: 'Payment requires authentication'
-      });
-    }
-
-    if (paymentIntent.status !== 'succeeded') {
-      console.log(`Payment failed for user ${userId}: status=${paymentIntent.status}`);
-      return res.status(400).json({
-        success: false,
-        message: `Payment failed: ${paymentIntent.status}`
-      });
+      if (paymentIntent.status !== 'succeeded') {
+        console.log(`Payment failed for user ${userId}: status=${paymentIntent.status}`);
+        return res.status(400).json({
+          success: false,
+          message: `Payment failed: ${paymentIntent.status}`
+        });
+      }
+    } else {
+      // Free subscription due to 100% discount (but still record admin fee structure)
+      console.log(`Free subscription created for user ${userId} due to 100% discount`);
     }
 
     // Create subscription document
-    const subscription = await Subscription.create({
+    const subscriptionData = {
       userId,
       userType,
       token: subscriptionToken,
       billingInterval,
       planName,
-      subscriptionAmount,
+      subscriptionAmount: finalAmount, // Store the final amount charged
       currency: currency.toUpperCase(),
       subscriptionPeriod: {
         startDate,
         endDate
       },
-      subscriptionPaymentIntent: paymentIntent.id,
       status: 'active',
       autoRenew
-    });
+    };
 
-    const transaction = await Transactions.create({
+    // Add payment intent ID if payment was processed
+    if (paymentIntent) {
+      subscriptionData.subscriptionPaymentIntent = paymentIntent.id;
+    }
+
+    // Add discount information if discount was applied
+    if (validDiscountToken) {
+      subscriptionData.discountApplied = {
+        token: discountToken,
+        percentage: discountPercentage,
+        originalAmount: subscriptionAmount,
+        discountAmount: subscriptionAmount - discountedAmount
+      };
+    }
+
+    // Add admin fee information
+    subscriptionData.adminFee = {
+      percentage: adminFeePercent,
+      amount: adminFeeAmount,
+      appliedToAmount: discountedAmount
+    };
+
+    const subscription = await Subscription.create(subscriptionData);
+
+    // Create transaction record
+    const transactionData = {
       userId,
       subscriptionId: subscription._id,
       type: 'subscription_payment',
-      amount: subscriptionAmount,
-      fee: 0,
-      netAmount: subscriptionAmount,
+      amount: finalAmount,
+      fee: adminFeeAmount, // Record the admin fee
+      netAmount: discountedAmount, // Net amount before admin fee
       currency: currency.toLowerCase(),
-      status: 'completed',
-      paymentMethod: 'stripe',
-      stripePaymentIntentId: paymentIntent.id,
-      stripeCustomerId: user.stripeCustomerId,
+      status: transactionStatus,
+      paymentMethod: finalAmount > 0 ? 'stripe' : 'discount',
       description
-    });
+    };
+
+    // Add Stripe information if payment was processed
+    if (paymentIntent) {
+      transactionData.stripePaymentIntentId = paymentIntent.id;
+      transactionData.stripeCustomerId = user.stripeCustomerId;
+    }
+
+    // Add discount information to transaction if discount was applied
+    if (validDiscountToken) {
+      transactionData.discountApplied = {
+        token: discountToken,
+        percentage: discountPercentage,
+        originalAmount: subscriptionAmount,
+        savedAmount: subscriptionAmount - discountedAmount
+      };
+    }
+
+    // Add admin fee information to transaction
+    transactionData.adminFee = {
+      percentage: adminFeePercent,
+      amount: adminFeeAmount
+    };
+
+    const transaction = await Transactions.create(transactionData);
+
+    // Deactivate the discount token after successful use
+    if (validDiscountToken) {
+      await DiscountToken.findByIdAndUpdate(validDiscountToken._id, {
+        isActive: false
+      });
+      console.log(`Discount token ${discountToken} has been deactivated after use`);
+    }
 
     user.isSubscribed = true;
     await user.save();
 
-    res.status(200).json({
+    const responseData = {
       success: true,
       message: 'Subscription created successfully',
       subscription: {
@@ -195,13 +314,32 @@ export const subscribe = async (req, res) => {
         planName,
         userType,
         billingInterval,
-        amount: subscriptionAmount,
+        originalAmount: subscriptionAmount,
+        finalAmount: finalAmount,
         currency: currency.toUpperCase(),
         startDate,
         endDate
       },
-      transactionId: transaction._id
-    });
+      transactionId: transaction._id,
+      pricing: {
+        originalAmount: subscriptionAmount,
+        discountedAmount: discountedAmount,
+        adminFeePercent: adminFeePercent,
+        adminFeeAmount: adminFeeAmount,
+        finalAmount: finalAmount
+      }
+    };
+
+    // Add discount information to response if discount was applied
+    if (validDiscountToken) {
+      responseData.discountApplied = {
+        percentage: discountPercentage,
+        savedAmount: subscriptionAmount - discountedAmount,
+        token: discountToken
+      };
+    }
+
+    res.status(200).json(responseData);
 
   } catch (error) {
     console.error('Error creating subscription:', error);
@@ -228,7 +366,6 @@ export const subscribe = async (req, res) => {
       message: 'Internal server error',
       error: error.message
     });
-
   }
 };
 
@@ -654,3 +791,58 @@ export const fetchTips = async (req, res) => {
   }
 }
 
+export const fetchDiscountToken = async (req, res) => {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: 'Discount token is required'
+      });
+    }
+
+    // Find the discount token
+    const discountTokenDoc = await DiscountToken.findOne({
+      token,
+      isActive: true
+    });
+
+    if (!discountTokenDoc) {
+      return res.status(404).json({
+        success: false,
+        message: 'Discount token not found or inactive'
+      });
+    }
+
+    // Check if token has expired (though it should auto-delete after 30 days)
+    const now = new Date();
+    const tokenCreatedAt = new Date(discountTokenDoc.createdAt);
+    const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+
+    if (tokenCreatedAt < thirtyDaysAgo) {
+      return res.status(400).json({
+        success: false,
+        message: 'Discount token has expired'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Discount code fetched successfully',
+      discountCode: {
+        token: discountTokenDoc.token,
+        discountPercentage: discountTokenDoc.discountPercentage,
+        createdAt: discountTokenDoc.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching discount code:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+    
+  }
+}

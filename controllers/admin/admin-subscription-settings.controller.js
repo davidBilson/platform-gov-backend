@@ -530,10 +530,9 @@ export const fetchDiscountCodes = async (req, res) => {
   }
 }
 
-
 export const toggleDiscountCode = async (req, res) => {
   try {
-    const discountCodeId = req.params.discountCodeId;
+    const discountCodeId = req.query.discountCodeId;
 
     const discountCode = await DiscountToken.findById(discountCodeId);
     if (!discountCode) {
