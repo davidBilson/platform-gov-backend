@@ -120,7 +120,6 @@ export const subscribe = async (req, res) => {
     // Apply admin fee to the discounted amount
     const adminFeeAmount = (discountedAmount * adminFeePercent) / 100;
     const finalAmount = discountedAmount + adminFeeAmount;
-rs
 
     // Check for existing active subscription
     const existingSubscription = await Subscription.findOne({
