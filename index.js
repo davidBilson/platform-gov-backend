@@ -18,6 +18,10 @@ const MAX_RETRIES = parseInt(process.env.MAX_RETRIES) || 3;
 let retryCount = 0;
 const RETRY_INTERVAL = parseInt(process.env.RETRY_INTERVAL) || 3000;
 
+// ===== ADDED: Fix for double notification triggers =====
+let notificationWatchers = null;
+// ===== END ADDITION =====
+
 const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
@@ -66,15 +70,27 @@ app.use((req, res) => {
   });
 });
 
+// ===== ADDED: Cleanup function for notification watchers =====
+const cleanupWatchers = () => {
+  if (notificationWatchers) {
+    console.log('Cleaning up notification watchers...');
+    if (typeof notificationWatchers.cleanup === 'function') {
+      notificationWatchers.cleanup();
+    }
+    notificationWatchers = null;
+  }
+};
+// ===== END ADDITION =====
+
 const configureSocketIO = () => {
   io.on('connection', (socket) => {
-    console.log('User connected:', socket.id);
+    // console.log('User connected:', socket.id);
     const userId = socket.handshake.auth.userId;
 
     socket.on('rejoin-rooms', (rooms) => {
       rooms.forEach(room => {
         socket.join(room);
-        console.log(`User ${userId} rejoined room ${room}`);
+        // console.log(`User ${userId} rejoined room ${room}`);
       });
     });
     
@@ -85,13 +101,13 @@ const configureSocketIO = () => {
     // Join user's personal room for notifications
     if (userId) {
       socket.join(userId.toString());
-      console.log(`User ${userId} joined their personal notification room`);
+      // console.log(`User ${userId} joined their personal notification room`);
     }
 
     // Room management for chat rooms
     socket.on('join-chat-room', (roomId) => {
       socket.join(roomId);
-      console.log(`User ${userId || socket.id} joined chat room ${roomId}`);
+      // console.log(`User ${userId || socket.id} joined chat room ${roomId}`);
     });
 
     // Handle marking messages as read
@@ -120,8 +136,14 @@ const configureSocketIO = () => {
     });
   });
 
-  // Setup notification watchers AFTER io is configured
-  setupNotificationWatchers(io);
+  // ===== MODIFIED: Only setup notification watchers if not already done =====
+  if (!notificationWatchers) {
+    console.log('Setting up notification watchers...');
+    notificationWatchers = setupNotificationWatchers(io);
+  } else {
+    console.log('Notification watchers already initialized, skipping setup');
+  }
+  // ===== END MODIFICATION =====
   
   // Attach io instance to app for use in controllers
   app.set('io', io);
