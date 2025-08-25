@@ -61,7 +61,6 @@ export const getTimesheetLogs = async (req, res) => {
 
     const contract = await Contract.findOne({
       _id: contractId,
-      paymentStructure: 'timesheet'
     });
 
     if (!contract) {
@@ -86,6 +85,7 @@ export const getTimesheetLogs = async (req, res) => {
     });
   }
 };
+
 export const stopWorkSession = async (req, res) => {
   try {
     console.log('====== STOP WORK SESSION START ======');
@@ -278,7 +278,6 @@ export const approveTimesheetEntry = async (req, res) => {
     const contract = await Contract.findOne({
       _id: contractId,
       clientId: userId,
-      paymentStructure: 'timesheet'
     });
 
     if (!contract) {
@@ -346,7 +345,6 @@ export const disputeTimesheetEntry = async (req, res) => {
     const contract = await Contract.findOne({
       _id: contractId,
       clientId: userId,
-      paymentStructure: 'timesheet'
     });
 
     if (!contract) {
@@ -476,7 +474,7 @@ export const logHoursManually = async (req, res) => {
     const contract = await Contract.findOne({
       _id: contractId,
       contractorId: userId,
-      paymentStructure: 'timesheet',
+      // paymentStructure: 'timesheet',
       status: 'active'
     });
 
