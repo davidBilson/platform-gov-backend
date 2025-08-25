@@ -352,14 +352,14 @@ export const trackPayoutAvailability = async (req, res) => {
 };
 
 // Cron job - now calls the extracted function
-cron.schedule('0 * * * *', async () => {
-    try {
-        const result = await processPayoutAvailability();
-        console.log(`Cron job completed: ${result.message}`);
-    } catch (error) {
-        console.error('Cron job failed:', error);
-    }
-});
+// cron.schedule('0 * * * *', async () => {
+//     try {
+//         const result = await processPayoutAvailability();
+//         console.log(`Cron job completed: ${result.message}`);
+//     } catch (error) {
+//         console.error('Cron job failed:', error);
+//     }
+// });
 
 export const getWithdrawableFunds = async (req, res) => {
     try {

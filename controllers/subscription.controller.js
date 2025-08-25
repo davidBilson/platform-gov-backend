@@ -790,6 +790,32 @@ export const fetchTips = async (req, res) => {
   }
 }
 
+export const fetchEarlyAccessDurationHours = async (req, res) => {
+  try {
+    const subscription = await AdminSubscriptionSettings.findOne({}, { earlyAccessDurationHours: 1, _id: 0 });
+
+    if (!subscription) {
+      return res.status(404).json({
+        success: false,
+        message: 'Early access duration not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Early access duration fetched successfully',
+      earlyAccessDurationHours: subscription.earlyAccessDurationHours
+    });
+  } catch (error) {
+    console.error('Error fetching early access duration:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+}
+
 export const fetchDiscountToken = async (req, res) => {
   try {
     const { token } = req.query;

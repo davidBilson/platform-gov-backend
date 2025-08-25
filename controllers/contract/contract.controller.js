@@ -534,6 +534,77 @@ const calculateTotalEarnings = async (contract) => {
   return totalEarnings;
 };
 
+// export const endContract = async (req, res) => {
+//   try {
+//     const { contractId } = req.params;
+//     const userId = req.body.userId;
+
+//     if (!contractId || !userId) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Contract ID and User ID are required'
+//       });
+//     }
+
+//     const contract = await Contract.findOne({
+//       _id: contractId,
+//       $or: [{ clientId: userId }, { contractorId: userId }]
+//     }).populate('jobId');
+
+//     if (!contract) {
+//       return res.status(404).json({
+//         success: false,
+//         message: 'Contract not found or unauthorized'
+//       });
+//     }
+
+//     if (contract.status === 'completed') {
+//       return res.status(200).json({
+//         success: false,
+//         message: 'Contract already completed!'
+//       });
+//     }
+
+//     if (contract.status !== 'active') {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Only active contracts can be ended'
+//       });
+//     }
+
+//     // Validate earnings amount
+//     const overAllEarnings = await calculateTotalEarnings(contract);
+
+//     if (overAllEarnings < 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Contract earnings cannot be negative"
+//       });
+//     }
+
+//     // Update contract with calculated earnings
+//     contract.totalEarnings = overAllEarnings;
+//     contract.status = 'completed';
+//     contract.endDate = new Date();
+//     await contract.save();
+
+//     res.status(200).json({
+//       success: true,
+//       data: contract,
+//       message: 'Contract ended successfully',
+//       totalEarnings: overAllEarnings
+//     });
+
+//   } catch (error) {
+//     console.error('Error ending contract:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'Server error ending contract',
+//       error: error.message
+//     });
+//   }
+// };
+
 export const endContract = async (req, res) => {
   try {
     const { contractId } = req.params;
@@ -587,6 +658,27 @@ export const endContract = async (req, res) => {
     contract.status = 'completed';
     contract.endDate = new Date();
     await contract.save();
+
+    // Update the associated job status to completed
+    if (contract.jobId) {
+      try {
+        await Job.findByIdAndUpdate(
+          contract.jobId,
+          { 
+            status: 'completed',
+            isCompleted: true,
+            updatedAt: new Date()
+          },
+          { new: true }
+        );
+      } catch (jobUpdateError) {
+        console.error('Error updating job status:', jobUpdateError);
+        // Note: We don't fail the contract completion if job update fails
+        // The contract has been successfully completed, job update is secondary
+      }
+    } else {
+      console.warn(`Contract ${contractId} has no associated jobId to update`);
+    }
 
     res.status(200).json({
       success: true,
