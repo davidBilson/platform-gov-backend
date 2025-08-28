@@ -35,7 +35,16 @@ export const uploadFile = async (fileBuffer, folder = 'uploads', resourceType = 
     const getResourceTypeFromName = (filename) => {
       if (!filename) return 'auto';
       const ext = filename.split('.').pop().toLowerCase();
-      if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) return 'image';
+      // if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) return 'image';
+      if ([
+        'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg',
+        'bmp', 'tiff', 'tif', 'ico',
+        'heif', 'heic', // modern Apple formats
+        'avif',          // modern, supported by browsers
+        'jfif',          // JPEG File Interchange Format
+        'pjpeg', 'pjp'   // progressive JPEG variants
+      ].includes(ext)) return 'image';
+      
       if (['mp4', 'mov', 'avi'].includes(ext)) return 'video';
       if (['pdf', 'doc', 'docx', 'xls', 'txt'].includes(ext)) return 'raw';
       return 'auto';
