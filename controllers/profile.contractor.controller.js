@@ -145,6 +145,7 @@ export const createContractorProfile = async (req, res) => {
     const skills = parseArrayField(req.body.skills);
     const expertise = parseArrayField(req.body.expertise);
     const certifications = parseArrayField(req.body.certifications);
+    const departments = parseArrayField(req.body.departments); // NEW
     const workHistory = parseArrayField(req.body.workHistory);
     const degrees = parseArrayField(req.body.degrees);
 
@@ -166,6 +167,7 @@ export const createContractorProfile = async (req, res) => {
       skills,
       expertise,
       certifications,
+      departments, // NEW
       workHistory,
       degrees
     };
@@ -218,6 +220,7 @@ export const updateContractorProfile = async (req, res) => {
     const skills = parseArrayField(req.body.skills) ?? profile.skills;
     // const expertise = parseArrayField(req.body.expertise) ?? profile.expertise;
     const certifications = parseArrayField(req.body.certifications) ?? profile.certifications;
+    const departments = parseArrayField(req.body.departments) ?? profile.departments; // NEW
     const workHistory = parseArrayField(req.body.workHistory) ?? profile.workHistory;
     const degrees = parseArrayField(req.body.degrees) ?? profile.degrees;
 
@@ -234,6 +237,7 @@ export const updateContractorProfile = async (req, res) => {
       skills,
       // expertise,
       certifications,
+      departments, // NEW
       workHistory,
       degrees,
       updatedAt: Date.now()
@@ -374,9 +378,61 @@ export const getMyProfile = async (req, res) => {
   }
 };
 
+// export const searchProfiles = async (req, res) => {
+//   try {
+//     const { skills, expertise, certifications, query, limit = 20, skip = 0 } = req.query;
+
+//     const searchCriteria = {};
+
+//     // Add search criteria based on query parameters
+//     if (skills) {
+//       searchCriteria.skills = { $in: skills.split(',') };
+//     }
+
+//     if (expertise) {
+//       searchCriteria.expertise = { $in: expertise.split(',') };
+//     }
+
+//     if (certifications) {
+//       searchCriteria.certifications = { $in: certifications.split(',') };
+//     }
+
+//     // Text search across multiple fields
+//     if (query) {
+//       searchCriteria.$or = [
+//         { primaryPosition: { $regex: query, $options: 'i' } },
+//         { bio: { $regex: query, $options: 'i' } }
+//       ];
+//     }
+
+//     // Find profiles matching criteria
+//     const profiles = await ContractorProfile.find(searchCriteria)
+//       .sort({ createdAt: -1 })
+//       .limit(parseInt(limit))
+//       .skip(parseInt(skip));
+
+//     // Count total matching profiles for pagination
+//     const total = await ContractorProfile.countDocuments(searchCriteria);
+
+//     res.status(200).json({
+//       success: true,
+//       count: profiles.length,
+//       total,
+//       data: profiles
+//     });
+//   } catch (error) {
+//     console.error('Search profiles error:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: error.message || 'Internal server error'
+//     });
+//   }
+// };
+
+
 export const searchProfiles = async (req, res) => {
   try {
-    const { skills, expertise, certifications, query, limit = 20, skip = 0 } = req.query;
+    const { skills, expertise, certifications, departments, query, limit = 20, skip = 0 } = req.query; // NEW
 
     const searchCriteria = {};
 
@@ -391,6 +447,11 @@ export const searchProfiles = async (req, res) => {
 
     if (certifications) {
       searchCriteria.certifications = { $in: certifications.split(',') };
+    }
+
+    // NEW: Add departments search
+    if (departments) {
+      searchCriteria.departments = { $in: departments.split(',') };
     }
 
     // Text search across multiple fields
@@ -472,6 +533,24 @@ export const getAllCertifications = async (req, res) => {
     });
   } catch (error) {
     console.error('Get certifications error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Internal server error'
+    });
+  }
+};
+
+export const getAllDepartments = async (req, res) => {
+  try {
+    const departments = await ContractorProfile.distinct('departments');
+
+    res.status(200).json({
+      success: true,
+      count: departments.length,
+      data: departments
+    });
+  } catch (error) {
+    console.error('Get departments error:', error);
     res.status(500).json({
       success: false,
       message: error.message || 'Internal server error'

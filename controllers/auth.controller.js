@@ -48,6 +48,7 @@ export const signUp = async (req, res, next) => {
     delete userData.phoneVerificationCode;
 
     try {
+      
       await emailService.sendVerificationCode(newUser.email, emailVerificationCode);
 
       return res.status(201).json({

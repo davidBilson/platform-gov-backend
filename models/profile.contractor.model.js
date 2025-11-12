@@ -118,6 +118,7 @@ const contractorProfileSchema = new Schema({
   skills: [String],
   expertise: [String],
   certifications: [String],
+  departments: [String], // NEW FIELD
   workHistory: [WorkHistorySchema],
   degrees: [DegreeSchema],
   createdAt: {
@@ -138,6 +139,7 @@ contractorProfileSchema.index({ user: 1 }, { unique: true });
 contractorProfileSchema.index({ skills: 1 });
 contractorProfileSchema.index({ expertise: 1 });
 contractorProfileSchema.index({ certifications: 1 });
+contractorProfileSchema.index({ departments: 1 }); // NEW INDEX
 
 
 // Document middleware: runs before .save() and .create()

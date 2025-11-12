@@ -76,6 +76,7 @@ const userSchema = new mongoose.Schema({
   phoneVerificationCode: String,
   resetToken: String,
   resetTokenExpiry: Date,
+  
   createdAt: {
     type: Date,
     default: Date.now
