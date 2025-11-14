@@ -81,7 +81,7 @@ export const getContractorProfile = async (req, res) => {
     let profile = await ContractorProfile.findOne({ user: userId })
       .populate({
         path: 'user',
-        select: 'name isHighPriority isSuspended bankAccounts'
+        select: 'name isHighPriority isSuspended bankAccounts isSubscribed'
       });
 
     if (!profile) {
@@ -167,7 +167,7 @@ export const createContractorProfile = async (req, res) => {
       skills,
       expertise,
       certifications,
-      departments, // NEW
+      departments,
       workHistory,
       degrees
     };
