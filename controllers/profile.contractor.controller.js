@@ -47,8 +47,8 @@ export const getAllContractorProfiles = async (req, res) => {
         };
 
         enhancedProfiles.push(enhancedProfile);
+
       } else {
-        // If user not found, just include the profile
         enhancedProfiles.push(profile.toObject());
       }
     }
@@ -58,6 +58,7 @@ export const getAllContractorProfiles = async (req, res) => {
       count: enhancedProfiles.length,
       data: enhancedProfiles
     });
+    
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -156,6 +157,7 @@ export const createContractorProfile = async (req, res) => {
     const profileData = {
       user: objectId,
       bio: req.body.bio || '',
+      linkedInUrl: req.body.linkedInUrl || '',
       profileImage,
       clearance: req.body.clearance || '',
       ratePerHour: req.body.ratePerHour || 0,
@@ -227,6 +229,7 @@ export const updateContractorProfile = async (req, res) => {
     // Prepare update data
     const updateData = {
       bio: req.body.bio || profile.bio,
+      linkedInUrl: req.body.linkedInUrl || profile.linkedInUrl,
       ratePerHour: req.body.ratePerHour || profile.ratePerHour,
       secondRate: req.body.secondRate || profile.secondRate,
       primaryPosition: req.body.primaryPosition || profile.primaryPosition,
@@ -377,58 +380,6 @@ export const getMyProfile = async (req, res) => {
     });
   }
 };
-
-// export const searchProfiles = async (req, res) => {
-//   try {
-//     const { skills, expertise, certifications, query, limit = 20, skip = 0 } = req.query;
-
-//     const searchCriteria = {};
-
-//     // Add search criteria based on query parameters
-//     if (skills) {
-//       searchCriteria.skills = { $in: skills.split(',') };
-//     }
-
-//     if (expertise) {
-//       searchCriteria.expertise = { $in: expertise.split(',') };
-//     }
-
-//     if (certifications) {
-//       searchCriteria.certifications = { $in: certifications.split(',') };
-//     }
-
-//     // Text search across multiple fields
-//     if (query) {
-//       searchCriteria.$or = [
-//         { primaryPosition: { $regex: query, $options: 'i' } },
-//         { bio: { $regex: query, $options: 'i' } }
-//       ];
-//     }
-
-//     // Find profiles matching criteria
-//     const profiles = await ContractorProfile.find(searchCriteria)
-//       .sort({ createdAt: -1 })
-//       .limit(parseInt(limit))
-//       .skip(parseInt(skip));
-
-//     // Count total matching profiles for pagination
-//     const total = await ContractorProfile.countDocuments(searchCriteria);
-
-//     res.status(200).json({
-//       success: true,
-//       count: profiles.length,
-//       total,
-//       data: profiles
-//     });
-//   } catch (error) {
-//     console.error('Search profiles error:', error);
-//     res.status(500).json({
-//       success: false,
-//       message: error.message || 'Internal server error'
-//     });
-//   }
-// };
-
 
 export const searchProfiles = async (req, res) => {
   try {

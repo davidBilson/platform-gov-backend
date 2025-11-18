@@ -16,6 +16,11 @@ const WorkHistorySchema = new Schema({
     type: String,
     trim: true
   },
+  responsibility: {
+    type: String,
+    trim: true,
+    default: ''
+  },
   departmentType: {
     type: String,
     enum: ['state', 'federal', ''],
@@ -73,6 +78,11 @@ const contractorProfileSchema = new Schema({
   },
   bio: {
     type: String,
+  },
+  linkedInUrl: {
+    type: String,
+    trim: true,
+    default: ''
   },
   profileImage: {
     type: String,
