@@ -12,6 +12,11 @@ const WorkHistorySchema = new Schema({
     type: String,
     trim: true
   },
+  company: {
+    type: String,
+    trim: true,
+    default: ''
+  },
   department: {
     type: String,
     trim: true
