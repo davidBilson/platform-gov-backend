@@ -20,6 +20,10 @@ export const signUp = async (req, res, next) => {
       return res.status(409).json({ message: 'Email already in use' });
     }
 
+    // Normalize phone number: remove all non-digit characters except +
+    // This handles cases like "15052076463", "+15052076463", "1-505-207-6463", "(505) 207-6463"
+    const normalizedPhoneNumber = phoneNumber ? phoneNumber.replace(/[^\d+]/g, '') : phoneNumber;
+
     // Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
@@ -34,7 +38,7 @@ export const signUp = async (req, res, next) => {
     const newUser = await User.create({
       name: `${firstName} ${lastName}`,
       email,
-      phoneNumber,
+      phoneNumber: normalizedPhoneNumber,
       password: hashedPassword,
       emailVerificationCode,
       phoneVerificationCode,
@@ -48,7 +52,7 @@ export const signUp = async (req, res, next) => {
     delete userData.phoneVerificationCode;
 
     try {
-      
+
       await emailService.sendVerificationCode(newUser.email, emailVerificationCode);
 
       return res.status(201).json({
@@ -127,6 +131,10 @@ export const sendPhoneVerificationCode = async (req, res, next) => {
       return res.status(400).json({ message: 'Email must be verified first' });
     }
 
+    if (!user.phoneNumber) {
+      return res.status(400).json({ message: 'Phone number is required for verification' });
+    }
+
     // Generate a new phone verification code if needed
     if (!user.phoneVerificationCode) {
       user.phoneVerificationCode = Math.floor(100000 + Math.random() * 900000).toString();
@@ -135,19 +143,20 @@ export const sendPhoneVerificationCode = async (req, res, next) => {
 
     // Send verification code via Twilio
     try {
-      await twilio.sendSMS(
+      const response = await twilio.sendSMS(
         user.phoneNumber,
-        `Your verification code is: ${user.phoneVerificationCode}`
+        `Your GovLink verification code is: ${user.phoneVerificationCode}`
       );
+      console.log('SMS response:', response);
+      return res.status(200).json({
+        status: 'success',
+        message: 'Verification code sent to your phone number',
+      });
+
     } catch (smsError) {
       console.error('Error sending SMS:', smsError);
       return res.status(500).json({ message: 'Failed to send verification code. Please try again.' });
     }
-
-    res.status(200).json({
-      status: 'success',
-      message: 'Verification code sent to your phone number'
-    });
   } catch (error) {
     next(error);
   }
@@ -165,6 +174,10 @@ export const verifyPhone = async (req, res, next) => {
 
     if (!user.isEmailVerified) {
       return res.status(400).json({ message: 'Email must be verified first' });
+    }
+
+    if (!user.phoneVerificationCode) {
+      return res.status(400).json({ message: 'No verification code found. Please request a new code.' });
     }
 
     if (user.phoneVerificationCode !== code) {
@@ -246,6 +259,10 @@ export const resendPhoneVerification = async (req, res, next) => {
       return res.status(400).json({ message: 'Phone already verified' });
     }
 
+    if (!user.phoneNumber) {
+      return res.status(400).json({ message: 'Phone number is required for verification' });
+    }
+
     // Generate a new verification code
     const newCode = Math.floor(100000 + Math.random() * 900000).toString();
     user.phoneVerificationCode = newCode;
@@ -255,7 +272,7 @@ export const resendPhoneVerification = async (req, res, next) => {
     try {
       await twilio.sendSMS(
         user.phoneNumber,
-        `Your verification code is: ${newCode}`
+        `Your GovLink verification code is: ${newCode}`
       );
     } catch (smsError) {
       console.error('Error sending SMS:', smsError);

@@ -19,10 +19,13 @@ const client = twilio(
  */
 const sendSMS = async (phoneNumber, message) => {
   try {
+    // Normalize phone number: remove all non-digit characters except +
+    let cleanedPhone = phoneNumber.replace(/[^\d+]/g, '');
+    
     // Ensure phone number has proper format with country code
-    let formattedPhone = phoneNumber;
-    if (!phoneNumber.startsWith('+')) {
-      formattedPhone = `+${phoneNumber}`;
+    let formattedPhone = cleanedPhone;
+    if (!cleanedPhone.startsWith('+')) {
+      formattedPhone = `+${cleanedPhone}`;
     }
 
     // Send the SMS via Twilio
