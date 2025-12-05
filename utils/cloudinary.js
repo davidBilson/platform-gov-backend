@@ -110,11 +110,6 @@ export const uploadImage = async (filePath, folder = 'profiles') => {
       overwrite: false
     });
     
-    console.log(`Successfully uploaded ${filePath} to Cloudinary`, {
-      public_id: result.public_id,
-      url: result.secure_url
-    });
-    
     return result;
   } catch (error) {
     console.error(`Error uploading image to Cloudinary: ${error.message}`, error);

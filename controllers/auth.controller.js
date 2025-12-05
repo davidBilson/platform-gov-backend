@@ -225,7 +225,7 @@ export const resendEmailVerification = async (req, res, next) => {
     // Send email with the new code
     // Placeholder for email sending logic
     try {
-      await emailService.sendVerificationCode(newUser.email, newCode);
+      await emailService.sendVerificationCode(user.email, newCode);
 
     } catch (emailError) {
       console.error('Error sending email:', emailError);

@@ -52,6 +52,12 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  profileStatus: {
+    type: String,
+    enum: ['pending', 'active', 'suspended'],
+    default: 'pending',
+    index: true
+  },
   stripeCustomerId: {
     type: String,
     default: null
@@ -76,7 +82,7 @@ const userSchema = new mongoose.Schema({
   phoneVerificationCode: String,
   resetToken: String,
   resetTokenExpiry: Date,
-  
+
   createdAt: {
     type: Date,
     default: Date.now

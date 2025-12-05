@@ -15,6 +15,7 @@ import milestoneRoutes from './milestone.routes.js';
 import timesheetRoutes from './timesheet.routes.js';
 import retainerRoutes from './retainer.routes.js';
 import ratingRoutes from './rating.routes.js';
+import vettingRoutes from './vetting.routes.js';
 
 const router = express.Router();
 
@@ -49,5 +50,7 @@ router.use('/timesheet', timesheetRoutes);
 router.use('/retainer', retainerRoutes);
 
 router.use('/rating', ratingRoutes);
+
+router.use('/vetting', vettingRoutes);
 
 export default router;

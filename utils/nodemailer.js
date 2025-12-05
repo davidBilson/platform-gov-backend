@@ -1,5 +1,10 @@
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import {
+  verificationCodeEmail,
+  vettingRequestEmail,
+  vettingActivationNotificationEmail
+} from './htmlEmails.js';
 
 dotenv.config({ path: './config/.env' });
 
@@ -32,9 +37,9 @@ const emailService = {
 
   sendVerificationCode: async (to, code) => {
     const subject = 'Email Verification Code';
-    const text = `Your authentication code is ${code}. This code will expire in 10 minutes.`;
+    const html = verificationCodeEmail(code);
 
-    return emailService.sendEmail({ to, subject, text });
+    return emailService.sendEmail({ to, subject, text: html });
   },
 
   verifyConnection: async () => {
@@ -46,6 +51,36 @@ const emailService = {
       console.error('Email service error:', error);
       return false;
     }
+  },
+
+  /**
+   * Send vetting request email to a vetter
+   */
+  sendVettingRequestEmail: async (vetterEmail, consultantName, profileUrl, confirmationUrl, rejectionUrl, isReminder = false) => {
+    const subject = isReminder
+      ? `Reminder: Please Confirm ${consultantName}'s GovLink Global Profile`
+      : `Please Confirm ${consultantName}'s GovLink Global Profile`;
+
+    const html = vettingRequestEmail(consultantName, profileUrl, confirmationUrl, rejectionUrl, isReminder);
+
+    return emailService.sendEmail({ to: vetterEmail, subject, text: html });
+  },
+
+  /**
+   * Send vetting activation notification to consultant
+   */
+  sendVettingActivationNotification: async (consultantEmail, consultantName, vettingCount) => {
+    const subject = 'Your GovLink Global Profile is Now Active!';
+    const html = vettingActivationNotificationEmail(consultantName, vettingCount, process.env.FRONTEND_URL);
+
+    return emailService.sendEmail({ to: consultantEmail, subject, text: html });
+  },
+
+  /**
+   * Send vetting reminder email (same as request but marked as reminder)
+   */
+  sendVettingReminderEmail: async (vetterEmail, consultantName, profileUrl, confirmationUrl, rejectionUrl) => {
+    return emailService.sendVettingRequestEmail(vetterEmail, consultantName, profileUrl, confirmationUrl, rejectionUrl, true);
   }
 };
 

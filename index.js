@@ -11,6 +11,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { setupNotificationWatchers } from './controllers/notification.controller.js';
 import { MessageThread } from './models/messaging.system.model.js';
+import { initializeVettingReminderService } from './services/vetting-reminder.service.js';
 
 const app = express();
 const PORT = process.env.PORT;
@@ -40,7 +41,7 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(origin
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) {
-    // if (allowedOrigins.includes(origin)) {
+      // if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS policy'));
@@ -64,9 +65,9 @@ app.set('io', io);
 app.use('/api', routes);
 
 app.use((req, res) => {
-  res.status(404).json({ 
+  res.status(404).json({
     error: 'Route not found',
-    path: req.originalUrl 
+    path: req.originalUrl
   });
 });
 
@@ -93,7 +94,7 @@ const configureSocketIO = () => {
         // console.log(`User ${userId} rejoined room ${room}`);
       });
     });
-    
+
     socket.on('error', (error) => {
       console.error('Socket error:', error);
     });
@@ -144,7 +145,7 @@ const configureSocketIO = () => {
     console.log('Notification watchers already initialized, skipping setup');
   }
   // ===== END MODIFICATION =====
-  
+
   // Attach io instance to app for use in controllers
   app.set('io', io);
 };
@@ -158,8 +159,11 @@ const startServer = async () => {
     // Configure Socket.io BEFORE starting server
     configureSocketIO();
 
+    // Initialize vetting reminder service
+    initializeVettingReminderService();
+
     // Start HTTP server
-    httpServer.listen(PORT, '0.0.0.0',() => {
+    httpServer.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running on port ${PORT}`);
       console.log(`Socket.IO server ready`);
       console.log('Notification watchers initialized');
