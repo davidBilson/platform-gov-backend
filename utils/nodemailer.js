@@ -16,11 +16,23 @@ const transporter = nodemailer.createTransport({
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
+  // Connection timeout settings for Render compatibility
+  connectionTimeout: 60000, // 60 seconds (default is 2000ms)
+  greetingTimeout: 30000,   // 30 seconds (default is 5000ms)
+  socketTimeout: 60000,     // 60 seconds (default is unlimited)
+  // Connection pool settings for better performance
+  pool: true,
+  maxConnections: 5,
+  maxMessages: 100,
+  // Debug option (set to true in development if needed)
+  debug: process.env.NODE_ENV === 'development',
+  logger: process.env.NODE_ENV === 'development'
 });
 
 const emailService = {
-  sendEmail: async ({ to, subject, text }) => {
+  sendEmail: async ({ to, subject, text, from }) => {
     const mailOptions = {
+      from: from || process.env.EMAIL_FROM || process.env.EMAIL_USER,
       to,
       subject,
       html: text,

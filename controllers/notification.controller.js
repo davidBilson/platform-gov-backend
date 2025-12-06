@@ -37,15 +37,17 @@ const createNotification = async (io, { userId, title, message, type, link = nul
 };
 
 let activeWatchers = new Set();
+let watchersInitialized = false;
 
 export const setupNotificationWatchers = (io) => {
   // Prevent duplicate watchers
-  if (activeWatchers.size > 0) {
+  if (watchersInitialized && activeWatchers.size > 0) {
     console.log('Notification watchers already active');
-    return;
+    return { initialized: true, watchers: activeWatchers };
   }
 
-  console.log('Setting up notification watchers...');
+  try {
+    console.log('Setting up notification watchers...');
 
   // Watch User collection for new users
   const userWatcher = User.watch([], {
@@ -336,13 +338,42 @@ export const setupNotificationWatchers = (io) => {
   });
   activeWatchers.add('contract');
 
-  console.log(`Set up ${activeWatchers.size} notification watchers`);
+    console.log(`Set up ${activeWatchers.size} notification watchers`);
+    watchersInitialized = true;
+    
+    return { initialized: true, watchers: activeWatchers };
+  } catch (error) {
+    console.error('Error setting up notification watchers:', error);
+    // Clean up any watchers that were added before the error
+    activeWatchers.forEach(watcher => {
+      try {
+        if (watcher && typeof watcher.close === 'function') {
+          watcher.close();
+        }
+      } catch (closeError) {
+        console.error('Error closing watcher:', closeError);
+      }
+    });
+    activeWatchers.clear();
+    watchersInitialized = false;
+    throw error;
+  }
 };
 
 // Clean up watchers on server shutdown
 export const cleanupWatchers = () => {
   console.log('Cleaning up notification watchers...');
+  activeWatchers.forEach(watcher => {
+    try {
+      if (watcher && typeof watcher.close === 'function') {
+        watcher.close();
+      }
+    } catch (error) {
+      console.error('Error closing watcher:', error);
+    }
+  });
   activeWatchers.clear();
+  watchersInitialized = false;
 };
 
 export const getNotifications = async (req, res) => {
