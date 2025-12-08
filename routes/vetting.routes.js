@@ -25,6 +25,3 @@ router.delete('/remove-vetter/:vetterId', removeVetter);
 router.post('/resend-email/:vetterId', resendVettingEmail);
 
 export default router;
-
-
-
