@@ -3,8 +3,8 @@ import User from '../../models/user.model.js';
 
 export const validateAdmin = async (req, res, next) => {
   try {
-
-    const { adminId } = req.method === 'GET' || req.method === 'PUT' || req.method === 'POST' || req.method === 'DELETE' ? req.query || req.body : req.body;
+    // Extract adminId from query params (GET requests) or body (POST/PUT/DELETE requests)
+    const adminId = req.query?.adminId || req.body?.adminId;
 
 
     if (!adminId) {

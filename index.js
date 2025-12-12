@@ -12,6 +12,7 @@ import { Server } from 'socket.io';
 import { setupNotificationWatchers, cleanupWatchers as cleanupNotificationWatchers } from './controllers/notification.controller.js';
 import { MessageThread } from './models/messaging.system.model.js';
 import { initializeVettingReminderService } from './services/vetting-reminder.service.js';
+import bcrypt from 'bcrypt';
 
 const app = express();
 const PORT = process.env.PORT || 5050;
@@ -77,13 +78,13 @@ const cleanupServer = async () => {
         });
         io = null;
       }
-      
+
       httpServer.close(() => {
         console.log('HTTP server closed');
         httpServer = null;
         resolve();
       });
-      
+
       // Force close after 5 seconds
       setTimeout(() => {
         if (io) {
@@ -192,7 +193,6 @@ const configureSocketIO = (httpServer) => {
   return io;
 };
 
-
 const startServer = async () => {
   try {
     // Clean up any existing server before starting
@@ -234,14 +234,14 @@ const startServer = async () => {
     httpServer.on('error', async (err) => {
       if (err.code === 'EADDRINUSE') {
         console.error(`Port ${PORT} is already in use. ${err.message}`);
-        
+
         // Try to find and kill the process using the port (development only)
         if (process.env.NODE_ENV !== 'production') {
           try {
             const { exec } = await import('child_process');
             const { promisify } = await import('util');
             const execAsync = promisify(exec);
-            
+
             // Find process on port (works on macOS/Linux)
             const { stdout } = await execAsync(`lsof -ti:${PORT}`);
             const pid = stdout.trim();

@@ -508,17 +508,10 @@ export const fetchDiscountCodes = async (req, res) => {
   try {
     const discountCodes = await DiscountToken.find();
 
-    if (!discountCodes || discountCodes.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'No active discount codes found'
-      });
-    }
-
     res.status(200).json({
       success: true,
       message: 'Discount codes fetched successfully',
-      discountCodes
+      discountCodes: discountCodes || []
     });
   } catch (error) {
     console.error('Error fetching discount codes:', error);

@@ -136,34 +136,6 @@ const contractorProfileSchema = new Schema({
   departments: [String], // NEW FIELD
   workHistory: [WorkHistorySchema],
   degrees: [DegreeSchema],
-  status: {
-    type: String,
-    enum: ['pending', 'active', 'suspended'],
-    default: 'pending',
-    index: true
-  },
-  vettingCount: {
-    type: Number,
-    default: 0,
-    min: 0
-  },
-  gccCertificationId: {
-    type: String,
-    trim: true,
-    default: ''
-  },
-  gccCertificationToken: {
-    type: String,
-    trim: true,
-    default: ''
-  },
-  gccCertificationVerified: {
-    type: Boolean,
-    default: false
-  },
-  gccCertificationDate: {
-    type: Date
-  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -183,8 +155,6 @@ contractorProfileSchema.index({ skills: 1 });
 contractorProfileSchema.index({ expertise: 1 });
 contractorProfileSchema.index({ certifications: 1 });
 contractorProfileSchema.index({ departments: 1 }); // NEW INDEX
-contractorProfileSchema.index({ status: 1 }); // For filtering active/pending profiles
-contractorProfileSchema.index({ vettingCount: 1 }); // For sorting by credibility
 
 
 // Document middleware: runs before .save() and .create()
